@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Face Anonymizer Tool Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#136dec",
+              "background-main": "#FFFFFF",
+              "card-border": "#e5e7eb",
+            },
+            fontFamily: { "display": ["Space Grotesk", "sans-serif"] },
+            borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+          },
+        },
+      }
+    </script>
+    <style>
+      body { font-family: "Space Grotesk", sans-serif; }
+      .custom-dashed-border {
+        border: 2px dashed #e5e7eb;
+        border-radius: 0.5rem;
+      }
+      .img-box {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        height: auto;
+        min-height: 240px;
+        max-height: 60vh;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        background: #fafafa;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .img-box .bg-blur {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: blur(24px);
+        transform: scale(1.1);
+        opacity: 0.35;
+      }
+      .img-box .img-main {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 0.5rem;
+      }
+      .dark .custom-dashed-border { border-color: #374151; }
+      .dark .img-box { border-color: #374151; background: #0f172a; }
+      .log-panel {
+        max-height: 180px;
+        overflow: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        background: #fbfbfb;
+        padding: 0.75rem;
+      }
+      .dark .log-panel {
+        border-color: #374151;
+        background: #0b1220;
+      }
+      .ant-shadow {
+        box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+      }
+      .toast-enter { transform: translateY(-8px); opacity: 0; }
+      .toast-enter-active { transform: translateY(0); opacity: 1; transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease-out; }
+      .toast-exit { transform: translateY(0); opacity: 1; }
+      .toast-exit-active { transform: translateY(-8px); opacity: 0; transition: transform 200ms ease, opacity 200ms ease; }
+      .toast { outline: none; }
+      .toast:focus-visible { box-shadow: 0 0 0 2px rgba(19, 109, 236, 0.35); border-radius: 0.5rem; }
+      .toast-body { word-break: break-word; }
+      .bg-success { background-color: #52c41a; }
+      .text-success { color: #52c41a; }
+      .bg-error { background-color: #ff4d4f; }
+      .text-error { color: #ff4d4f; }
+      .bg-warning { background-color: #faad14; }
+      .text-warning { color: #faad14; }
+      .bg-info { background-color: #136dec; }
+      .text-info { color: #136dec; }
+    </style>
+  </head>
+  <body class="bg-background-main text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
+    <div class="layout-container flex h-full grow flex-col">
+      <header class="grid grid-cols-[1fr_auto_1fr] items-center whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-700 px-6 lg:px-10 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-primary rounded-lg text-white flex items-center justify-center">
+            <span class="material-symbols-outlined">face_retouching_off</span>
+          </div>
+          <h2 class="text-xl font-bold leading-tight tracking-tight text-slate-900 dark:text-slate-100">Face Anonymizer</h2>
+        </div>
+        <div class="flex items-center justify-center justify-self-center">
+          <div id="sourceTabs" class="relative flex items-center gap-2 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 p-1 shadow-sm backdrop-blur-sm transition-colors">
+            <span id="tabIndicator" class="absolute rounded-full bg-primary/20 dark:bg-primary/30 tab-indicator" style="z-index:0; top:4px; left:4px; height:32px; width:calc(50% - 4px);"></span>
+            <button id="tabImage" class="px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10">Image</button>
+            <button id="tabVideo" class="px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10">Video</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 justify-self-end">
+          <button id="themeBtn" class="relative overflow-hidden flex items-center justify-center rounded-lg h-10 w-10 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors" title="Theme">
+            <span id="themeIcon" class="material-symbols-outlined">light_mode</span>
+          </button>
+        </div>
+      </header>
+      <main class="max-w-[1200px] mx-auto w-full p-4 lg:p-8">
+        <div class="flex flex-col gap-1.5 mb-2">
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Privacy Guard Dashboard</h1>
+          <p class="text-slate-600 text-base max-w-xl mb-4">
+            High-performance face detection and obfuscation tool. Securely process images and videos on your device — no cloud upload.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-7">
+          <div class="flex flex-col gap-4">
+            <div class="flex items-center justify-between px-2">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">upload_file</span>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Input Image</h3>
+              </div>
+              <span class="text-xs font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-full uppercase tracking-wider">Source</span>
+            </div>
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[360px] glass-panel dark:bg-slate-800">
+              <div class="flex-1 p-8 flex flex-col">
+                <div id="dropArea" class="flex-1 img-box custom-dashed-border bg-slate-50 dark:bg-slate-900 transition-all cursor-pointer flex flex-col items-center justify-center gap-4 text-center p-8">
+                  <div class="size-16 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center transition-transform">
+                    <span class="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                  </div>
+                  <div>
+                    <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag image to upload</p>
+                    <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
+                  </div>
+                  <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                    Browse Files
+                  </button>
+                  <input id="fileInput" type="file" accept="image/*" class="hidden" />
+                </div>
+              </div>
+              <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <span id="statusText" class="text-xs text-slate-500 italic">No file selected</span>
+                <div class="flex gap-2">
+                  <span class="size-2 rounded-full bg-slate-200"></span>
+                  <span class="size-2 rounded-full bg-slate-200"></span>
+                  <span class="size-2 rounded-full bg-slate-200"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-4">
+            <div class="flex items-center justify-between px-2">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-green-600">verified_user</span>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Anonymized Output</h3>
+              </div>
+              <span class="text-xs font-semibold bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full uppercase tracking-wider">Result</span>
+            </div>
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[360px] glass-panel dark:bg-slate-800">
+              <div class="flex-1 p-8 flex flex-col relative overflow-hidden group">
+                <div id="resultBox" class="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg flex flex-col items-center justify-center gap-4 text-center img-box p-8">
+                  <span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span>
+                  <p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>
+                </div>
+              </div>
+              <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-end items-center">
+                <button id="downloadBtn" class="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold cursor-not-allowed pointer-events-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900" disabled>
+                  <span class="material-symbols-outlined text-[20px]">download</span>
+                  Download Result
+                </button>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 lg:p-8 shadow-sm glass-panel dark:bg-slate-800">
+          <div class="flex flex-col lg:flex-row items-center gap-8 lg:justify-between">
+            <div class="flex flex-col md:flex-row items-center gap-6 w-full lg:w-auto">
+              <div class="flex flex-col gap-1.5 w-full md:w-64">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Anonymization Type</label>
+                <div class="relative">
+                  <select id="typeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg py-3 pl-4 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary appearance-none transition-all">
+                    <option value="blur">Gaussian Blur (Default)</option>
+                    <option value="pixelate">Pixelation Grid</option>
+                    <option value="black_bar">Censored Black Bar</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5 w-full md:w-48">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Intensity</label>
+                <div class="flex items-center gap-3 py-3">
+                  <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="30"/>
+                  <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">30%</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+              <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                <span class="material-symbols-outlined">auto_fix_high</span>
+                Anonymize Now
+              </button>
+              <button id="clearBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold transition-all dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                <span class="material-symbols-outlined text-[20px]">restart_alt</span>
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+      <div id="toastContainer" class="fixed top-20 right-8 z-[100] flex flex-col gap-4 w-80 pointer-events-none" role="region" aria-live="polite" aria-label="Notifications"></div>
+      <!--
+      <section class="max-w-[1200px] mx-auto w-full px-6 lg:px-10 pb-10">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
+          <div class="flex justify-between items-center mb-3">
+            <h4 class="text-sm font-bold text-slate-700 dark:text-slate-200">Logs</h4>
+            <div class="flex gap-2">
+              <button id="copyLogsBtn" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-bold">Copy</button>
+              <button id="clearLogsBtn" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-bold">Clear</button>
+            </div>
+          </div>
+          <div id="errorLog" class="log-panel text-xs font-mono text-slate-700 dark:text-slate-200"></div>
+        </div>
+      </section>
+      -->
+    </div>
+    <script>
+      const themeBtn = document.getElementById('themeBtn');
+      const themeIcon = document.getElementById('themeIcon');
+      const fileInput = document.getElementById('fileInput');
+      const browseBtn = document.getElementById('browseBtn');
+      const dropArea = document.getElementById('dropArea');
+      const statusText = document.getElementById('statusText');
+      const resultBox = document.getElementById('resultBox');
+      const anonymizeBtn = document.getElementById('anonymizeBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const intensityRange = document.getElementById('intensityRange');
+      const intensityLabel = document.getElementById('intensityLabel');
+      const typeSelect = document.getElementById('typeSelect');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const tabImage = document.getElementById('tabImage');
+      const tabVideo = document.getElementById('tabVideo');
+      const sourceTabs = document.getElementById('sourceTabs');
+      const tabIndicator = document.getElementById('tabIndicator');
+      const logView = document.getElementById('errorLog');
+      const copyLogsBtn = document.getElementById('copyLogsBtn');
+      const clearLogsBtn = document.getElementById('clearLogsBtn');
+      
+
+      let selectedFile = null;
+      let resultBlobUrl = null;
+      let reprocTimer = null;
+      let busy = false;
+      let currentAbortController = null;
+      const logs = [];
+      let source = 'image';
+      const MIN_PROCESS_MS = 800;
+      const metricFaces = () => document.getElementById('metricFaces');
+      const metricTime = () => document.getElementById('metricTime');
+      const metricType = () => document.getElementById('metricType');
+      const metricStatus = () => document.getElementById('metricStatus');
+
+      function applyTheme(t) {
+        const isDark = t === 'dark';
+        document.documentElement.classList.toggle('dark', isDark);
+        themeIcon.textContent = isDark ? 'dark_mode' : 'light_mode';
+      }
+      function initTheme() {
+        const saved = localStorage.getItem('theme');
+        let mode = saved;
+        if (!mode) {
+          const prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          mode = prefers ? 'dark' : 'light';
+        }
+        applyTheme(mode);
+      }
+      themeBtn.addEventListener('click', () => {
+        const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+        localStorage.setItem('theme', next);
+        applyTheme(next);
+        themeIcon.classList.remove('sun-toggle-anim','moon-toggle-anim');
+        void themeIcon.offsetWidth;
+        themeIcon.classList.add(next === 'dark' ? 'moon-toggle-anim' : 'sun-toggle-anim');
+        themeBtn.classList.add('theme-ripple');
+        setTimeout(() => themeBtn.classList.remove('theme-ripple'), 420);
+      });
+      initTheme();
+      function bindUploadControls() {
+        const btn = document.getElementById('browseBtn');
+        const input = document.getElementById('fileInput');
+        const vbtn = document.getElementById('browseVideoBtn');
+        const vinput = document.getElementById('videoInput');
+        if (source === 'image') {
+          if (btn) btn.addEventListener('click', () => input && input.click());
+          if (input) input.addEventListener('change', (e) => handleFiles(e.target.files));
+        } else {
+          if (vbtn) vbtn.addEventListener('click', () => vinput && vinput.click());
+          if (vinput) vinput.addEventListener('change', (e) => handleFiles(e.target.files));
+        }
+      }
+      bindUploadControls();
+      setAnonymizeEnabled(false, false);
+
+      function logMsg(msg, level = 'info') {}
+      /* window.addEventListener('error', (e) => logMsg(e.message, 'error'));
+      window.addEventListener('unhandledrejection', (e) => logMsg(String(e.reason), 'error'));
+      if (copyLogsBtn) copyLogsBtn.addEventListener('click', async () => {});
+      if (clearLogsBtn) clearLogsBtn.addEventListener('click', () => {}); */
+
+      ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => e.preventDefault());
+        dropArea.addEventListener(eventName, (e) => e.stopPropagation());
+      });
+      dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+      function positionTabIndicator(btn) {
+        if (!tabIndicator || !btn || !sourceTabs) return;
+        const left = btn.offsetLeft;
+        const top = btn.offsetTop;
+        const width = btn.offsetWidth;
+        const height = btn.offsetHeight;
+        tabIndicator.style.left = `${left}px`;
+        tabIndicator.style.top = `${top}px`;
+        tabIndicator.style.width = `${width}px`;
+        tabIndicator.style.height = `${height}px`;
+      }
+      function updateMetrics({ faces = null, ms = null, type = '', status = '' }) {
+        if (metricFaces()) metricFaces().textContent = faces === null ? '—' : String(faces);
+        if (metricTime()) metricTime().textContent = ms === null ? '—' : `${Math.round(ms)} ms`;
+        if (metricType()) metricType().textContent = type ? type.replace('_',' ') : '—';
+        if (metricStatus()) metricStatus().textContent = status || '—';
+      }
+      function setSource(next) {
+        source = next;
+        const imgActive = next === 'image';
+        dropArea.innerHTML = imgActive ? renderDropAreaContent() : renderVideoPlaceholderContent();
+        bindUploadControls();
+        tabImage.className = imgActive
+          ? 'px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10'
+          : 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10';
+        tabVideo.className = imgActive
+          ? 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10'
+          : 'px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10';
+        positionTabIndicator(imgActive ? tabImage : tabVideo);
+        if (imgActive) statusText.textContent = selectedFile ? selectedFile.name : 'No file selected';
+        else statusText.textContent = 'Video selected';
+        if (!imgActive) { setAnonymizeEnabled(false, false); setDownloadEnabled(false); }
+      }
+      setSource('image');
+      tabImage.addEventListener('click', () => setSource('image'));
+      tabVideo.addEventListener('click', () => setSource('video'));
+      window.addEventListener('resize', () => positionTabIndicator(source === 'image' ? tabImage : tabVideo));
+
+      intensityRange.addEventListener('input', () => {
+        intensityLabel.textContent = intensityRange.value + '%';
+      });
+      typeSelect.addEventListener('change', () => {
+        const txt = typeSelect.options[typeSelect.selectedIndex].text;
+        statusText.textContent = `Type: ${txt}`;
+      });
+
+      clearBtn.addEventListener('click', () => {
+        selectedFile = null;
+        if (reprocTimer) { clearTimeout(reprocTimer); reprocTimer = null; }
+        if (currentAbortController) { try { currentAbortController.abort(); } catch {} currentAbortController = null; }
+        busy = false;
+        dropArea.innerHTML = renderDropAreaContent();
+        bindUploadControls();
+        resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
+        statusText.textContent = 'No file selected';
+        
+        setDownloadEnabled(false);
+        setAnonymizeEnabled(false, false);
+        updateMetrics({ faces: null, ms: null, type: '', status: '' });
+        if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); resultBlobUrl = null; }
+      });
+
+      anonymizeBtn.addEventListener('click', () => source === 'image' ? runAnonymize() : runAnonymizeVideo());
+      async function runAnonymize() {
+        if (busy) return;
+        if (!selectedFile) { toast('Please select an image first', 'warning', 4000); return; }
+        let start = 0;
+        let success = false;
+        try {
+          busy = true;
+          setAnonymizeEnabled(false, true);
+          start = performance.now();
+          const fd = new FormData();
+          fd.append('image', selectedFile);
+          fd.append('type', typeSelect.value);
+          fd.append('intensity', intensityRange.value);
+          currentAbortController = new AbortController();
+          const resp = await fetch('/api/anonymize', { method: 'POST', body: fd, signal: currentAbortController.signal });
+          if (!resp.ok) {
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const j = await resp.json();
+              throw new Error(j && j.error ? j.error : 'Image processing failed');
+            }
+            throw new Error('Image processing failed');
+          }
+          const blob = await resp.blob();
+          if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); }
+          resultBlobUrl = URL.createObjectURL(blob);
+          toast('Anonymized image ready', 'success', 4000);
+          success = true;
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            // cancelled
+          } else {
+            logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
+            toast(err && err.message ? err.message : 'Error processing image', 'error', 6000);
+          }
+        } finally {
+          currentAbortController = null;
+          const end = performance.now();
+          const diff = MIN_PROCESS_MS - (end - start);
+          if (diff > 0) { await new Promise(r => setTimeout(r, diff)); }
+          if (success && resultBlobUrl) {
+            resultBox.innerHTML = `<img class="bg-blur" src="${resultBlobUrl}" alt=""><img class="img-main" src="${resultBlobUrl}" alt="Anonymized">`;
+            setDownloadEnabled(true);
+          }
+          busy = false;
+          setAnonymizeEnabled(true, false);
+        }
+      }
+      async function runAnonymizeVideo() {
+        if (busy) return;
+        if (!selectedFile) { toast('Please select a video first', 'warning', 4000); return; }
+        let start = 0;
+        let success = false;
+        try {
+          busy = true;
+          setAnonymizeEnabled(false, true);
+          start = performance.now();
+          const fd = new FormData();
+          fd.append('video', selectedFile);
+          fd.append('type', typeSelect.value);
+          fd.append('intensity', intensityRange.value);
+          currentAbortController = new AbortController();
+          const resp = await fetch('/api/anonymize_video', { method: 'POST', body: fd, signal: currentAbortController.signal });
+          if (!resp.ok) {
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const j = await resp.json();
+              throw new Error(j && j.error ? j.error : 'Video processing failed');
+            }
+            throw new Error('Video processing failed');
+          }
+          const blob = await resp.blob();
+          if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); }
+          resultBlobUrl = URL.createObjectURL(blob);
+          toast('Anonymized video ready', 'success', 4000);
+          success = true;
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            // cancelled
+          } else {
+            logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
+            toast(err && err.message ? err.message : 'Error processing video', 'error', 6000);
+          }
+        } finally {
+          currentAbortController = null;
+          const end = performance.now();
+          const diff = MIN_PROCESS_MS - (end - start);
+          if (diff > 0) { await new Promise(r => setTimeout(r, diff)); }
+          if (success && resultBlobUrl) {
+            resultBox.innerHTML = `<video class="img-main w-full h-full" src="${resultBlobUrl}" controls></video>`;
+            setDownloadEnabled(true);
+          }
+          busy = false;
+          setAnonymizeEnabled(true, false);
+        }
+      }
+      function scheduleAnonymize() {
+        if (!selectedFile) return;
+        if (reprocTimer) clearTimeout(reprocTimer);
+        reprocTimer = setTimeout(() => runAnonymize(), 250);
+      }
+      function setAnonymizeEnabled(enabled, processing) {
+        if (enabled) {
+          anonymizeBtn.classList.remove('cursor-not-allowed','opacity-50');
+          anonymizeBtn.innerHTML = `<span class="material-symbols-outlined">auto_fix_high</span> Anonymize Now`;
+        } else {
+          if (processing) {
+            anonymizeBtn.innerHTML = `Processing...`;
+          }
+          anonymizeBtn.classList.add('cursor-not-allowed','opacity-50');
+        }
+      }
+
+      
+
+      function toast(msg, type = 'info', duration = 4000) {
+        statusText.textContent = msg;
+        showToast({ title: type === 'error' ? 'Error' : type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : 'Info', message: msg, type, duration });
+      }
+
+      function handleFiles(files) {
+        if (!files || !files.length) return;
+        const f = files[0];
+        if (source === 'image') {
+          if (f.size > 10 * 1024 * 1024) {
+            const msg = 'File too large (max 10MB)';
+            logMsg(msg, 'warn');
+            toast(msg, 'warning', 5000);
+            return;
+          }
+          selectedFile = f;
+          const url = URL.createObjectURL(f);
+          logMsg(`Selected file: ${f.name} (${f.size} bytes)`, 'info');
+          dropArea.innerHTML = `<img class="bg-blur" src="${url}" alt=""><img class="img-main" src="${url}" alt="Original">`;
+          statusText.textContent = f.name;
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
+          setDownloadEnabled(false);
+          setAnonymizeEnabled(true, false);
+        } else {
+          if (f.size > 200 * 1024 * 1024) {
+            const msg = 'Video too large (max 200MB)';
+            logMsg(msg, 'warn');
+            toast(msg, 'warning', 5000);
+            return;
+          }
+          selectedFile = f;
+          const url = URL.createObjectURL(f);
+          logMsg(`Selected video: ${f.name} (${f.size} bytes)`, 'info');
+          dropArea.innerHTML = `<video class="img-main w-full h-full" src="${url}" controls></video>`;
+          statusText.textContent = f.name;
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed video will appear here after clicking 'Anonymize'</p>`;
+          setDownloadEnabled(false);
+          setAnonymizeEnabled(true, false);
+        }
+      }
+
+      
+
+      function renderDropAreaContent() {
+        return `
+          <div class="size-16 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center transition-transform">
+            <span class="material-symbols-outlined text-3xl">add_photo_alternate</span>
+          </div>
+          <div>
+            <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag image to upload</p>
+            <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
+          </div>
+          <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
+            Browse Files
+          </button>
+          <input id="fileInput" type="file" accept="image/*" class="hidden" />
+        `;
+      }
+      function renderVideoPlaceholderContent() {
+        return `
+          <div class="size-16 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center">
+            <span class="material-symbols-outlined text-3xl">movie_filter</span>
+          </div>
+          <div>
+            <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag video to upload</p>
+            <p class="text-sm text-slate-500 mt-1">Supports MP4 or WEBM (Max ~200MB)</p>
+          </div>
+          <button id="browseVideoBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
+            Browse Videos
+          </button>
+          <input id="videoInput" type="file" accept="video/*" class="hidden" />
+        `;
+      }
+      function showToast({ title, message, type = 'info', duration = 4000 }) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        const iconMap = { success: 'check_circle', error: 'cancel', warning: 'warning', info: 'info' };
+        const colorClass = type === 'success' ? { bar: 'bg-success', icon: 'text-success' } :
+          type === 'error' ? { bar: 'bg-error', icon: 'text-error' } :
+          type === 'warning' ? { bar: 'bg-warning', icon: 'text-warning' } :
+          { bar: 'bg-info', icon: 'text-info' };
+        const el = document.createElement('div');
+        el.className = 'toast bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-lg p-4 ant-shadow flex items-start gap-3 relative overflow-hidden pointer-events-auto toast-enter';
+        el.setAttribute('role', 'alert');
+        el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        el.innerHTML = `
+          <div class="absolute top-0 left-0 w-1 h-full ${colorClass.bar}"></div>
+          <span class="material-symbols-outlined ${colorClass.icon}">${iconMap[type]}</span>
+          <div class="flex-1 toast-body">
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">${title}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${message}</p>
+          </div>
+          <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Close notification">
+            <span class="material-symbols-outlined text-lg">close</span>
+          </button>
+        `;
+        const closeBtn = el.querySelector('button');
+        const remove = () => {
+          el.classList.remove('toast-enter','toast-enter-active');
+          el.classList.add('toast-exit','toast-exit-active');
+          setTimeout(() => { el.remove(); }, 200);
+        };
+        closeBtn.addEventListener('click', remove);
+        container.prepend(el);
+        requestAnimationFrame(() => {
+          el.classList.add('toast-enter-active');
+        });
+        let timer = null;
+        const startTimer = () => {
+          if (duration && duration > 0) {
+            timer = setTimeout(remove, duration);
+          }
+        };
+        const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+        el.addEventListener('mouseenter', clearTimer);
+        el.addEventListener('mouseleave', startTimer);
+        el.addEventListener('keydown', (e) => { if (e.key === 'Escape') remove(); });
+        el.tabIndex = 0;
+        startTimer();
+        const max = 4;
+        const children = Array.from(container.children);
+        if (children.length > max) {
+          for (let i = children.length - 1; i >= max; i--) {
+            children[i].remove();
+          }
+        }
+      }
+      function setDownloadEnabled(enabled) {
+        if (!downloadBtn) return;
+        if (enabled && resultBlobUrl) {
+          downloadBtn.classList.remove('cursor-not-allowed','pointer-events-none','text-slate-400','dark:text-slate-500','bg-slate-100','dark:bg-slate-800','border-slate-200','dark:border-slate-700');
+          downloadBtn.classList.add('bg-primary','hover:bg-primary/90','text-white','border','border-primary');
+          downloadBtn.removeAttribute('disabled');
+        } else {
+          downloadBtn.classList.add('cursor-not-allowed','pointer-events-none','text-slate-400','dark:text-slate-500','bg-slate-100','dark:bg-slate-800','border','border-slate-200','dark:border-slate-700');
+          downloadBtn.classList.remove('bg-primary','hover:bg-primary/90','text-white','border-primary');
+          downloadBtn.setAttribute('disabled','');
+        }
+      }
+      downloadBtn.addEventListener('click', () => {
+        if (!resultBlobUrl || downloadBtn.hasAttribute('disabled')) return;
+        logMsg('Downloading result...', 'info');
+        const a = document.createElement('a');
+        a.href = resultBlobUrl;
+        a.download = source === 'image' ? 'anonymized.jpg' : 'anonymized.mp4';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+      function mapIntensityToBlur(percent) {
+        const p = Math.max(5, Math.min(100, Number(percent)));
+        return 2 + (p / 100) * 8;
+      }
+    </script>
+  </body>
+</html>
