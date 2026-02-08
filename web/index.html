@@ -339,6 +339,14 @@
         if (metricStatus()) metricStatus().textContent = status || '—';
       }
       function setSource(next) {
+        // abort any in-flight processing and reset timers
+        if (reprocTimer) { clearTimeout(reprocTimer); reprocTimer = null; }
+        if (currentAbortController) { try { currentAbortController.abort(); } catch {} currentAbortController = null; }
+        busy = false;
+        // clear selected data and revoke blobs
+        selectedFile = null;
+        if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); resultBlobUrl = null; }
+        // switch source and rebuild UI
         source = next;
         const imgActive = next === 'image';
         dropArea.innerHTML = imgActive ? renderDropAreaContent() : renderVideoPlaceholderContent();
@@ -350,9 +358,17 @@
           ? 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10'
           : 'px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10';
         positionTabIndicator(imgActive ? tabImage : tabVideo);
-        if (imgActive) statusText.textContent = selectedFile ? selectedFile.name : 'No file selected';
-        else statusText.textContent = 'Video selected';
-        if (!imgActive) { setAnonymizeEnabled(false, false); setDownloadEnabled(false); }
+        statusText.textContent = 'No file selected';
+        // reset result box placeholder to match new source
+        if (imgActive) {
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
+        } else {
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed video will appear here after clicking 'Anonymize'</p>`;
+        }
+        // disable actions and clear metrics
+        setDownloadEnabled(false);
+        setAnonymizeEnabled(false, false);
+        updateMetrics({ faces: null, ms: null, type: '', status: '' });
       }
       setSource('image');
       tabImage.addEventListener('click', () => setSource('image'));
@@ -473,7 +489,13 @@
           const diff = MIN_PROCESS_MS - (end - start);
           if (diff > 0) { await new Promise(r => setTimeout(r, diff)); }
           if (success && resultBlobUrl) {
-            resultBox.innerHTML = `<video class="img-main w-full h-full" src="${resultBlobUrl}" controls></video>`;
+            resultBox.innerHTML = `<video class="img-main w-full h-full" controls preload="metadata" playsinline>
+              <source src="${resultBlobUrl}" type="video/mp4">
+            </video>`;
+            const vid = resultBox.querySelector('video');
+            vid.addEventListener('error', () => {
+              toast('Unable to preview video (codec or format not supported)', 'error', 6000);
+            });
             setDownloadEnabled(true);
           }
           busy = false;

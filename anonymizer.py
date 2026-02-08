@@ -1,6 +1,8 @@
 import cv2
 import sys
 import os
+import shutil
+import subprocess
 from typing import Tuple, List
 
 def load_cascade():
@@ -47,6 +49,35 @@ def process_array(img, method: str = "blur", intensity: int = 30):
 
  
 
+def _ffmpeg_path() -> str:
+    return shutil.which("ffmpeg") or ""
+
+def _mux_audio_with_ffmpeg(video_no_audio: str, source_with_audio: str, final_out: str) -> bool:
+    ffmpeg = _ffmpeg_path()
+    if not ffmpeg:
+        return False
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i", video_no_audio,
+        "-i", source_with_audio,
+        "-map", "0:v:0",
+        "-map", "1:a?",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest",
+        final_out,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, check=False)
+    except Exception:
+        return False
+    return proc.returncode == 0 and os.path.exists(final_out) and os.path.getsize(final_out) > 0
+
 def process_video(input_path: str, output_path: str, method: str = "blur", intensity: int = 30) -> Tuple[str, int]:
     if not os.path.exists(input_path):
         print(f"Error: Video file not found at {input_path}")
@@ -61,7 +92,11 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_dir = os.path.dirname(output_path) or "."
     os.makedirs(out_dir, exist_ok=True)
-    writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    temp_out = os.path.join(out_dir, "_temp_no_audio.mp4")
+    try:
+        writer = cv2.VideoWriter(temp_out, fourcc, fps, (width, height))
+    except Exception:
+        writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     face_cascade = load_cascade()
     total_faces = 0
     while True:
@@ -76,4 +111,21 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
         writer.write(frame)
     cap.release()
     writer.release()
-    return output_path, total_faces
+    final = output_path
+    produced = False
+    if os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
+        if _mux_audio_with_ffmpeg(temp_out, input_path, final):
+            produced = True
+        else:
+            # Fallback: just move temp output to final (video-only)
+            try:
+                os.replace(temp_out, final)
+                produced = True
+            except Exception:
+                produced = False
+    else:
+        produced = os.path.exists(output_path) and os.path.getsize(output_path) > 0
+    if not produced:
+        print("Error: Failed to produce output video.")
+        return "", total_faces
+    return final, total_faces
