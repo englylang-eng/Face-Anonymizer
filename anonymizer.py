@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from typing import Tuple, List
+import numpy as np
 
 def load_cascade():
     cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -23,11 +24,33 @@ def _apply_anonymization(img, rects: List[Tuple[int,int,int,int]], method: str =
     for (x, y, w, h) in rects:
         roi = img[y:y+h, x:x+w]
         if method == "pixelate":
-            down_w = max(1, w // max(2, pixel_scale))
-            down_h = max(1, h // max(2, pixel_scale))
-            down = cv2.resize(roi, (down_w, down_h), interpolation=cv2.INTER_NEAREST)
-            up = cv2.resize(down, (w, h), interpolation=cv2.INTER_NEAREST)
-            img[y:y+h, x:x+w] = up
+            max_dim = max(w, h)
+            min_dim = min(w, h)
+            block = int(max(8, (intensity / 100.0) * min_dim * 0.5))
+            block = min(block, max_dim)
+            pad = int((intensity / 100.0) * 0.15 * max_dim)
+            px = max(0, x - pad)
+            py = max(0, y - pad)
+            ex = min(img.shape[1], x + w + pad)
+            ey = min(img.shape[0], y + h + pad)
+            start_x = px - (px % block)
+            start_y = py - (py % block)
+            end_x = ex
+            end_y = ey
+            bx = start_x
+            while bx < end_x:
+                by = start_y
+                while by < end_y:
+                    tx0 = px if bx < px else bx
+                    ty0 = py if by < py else by
+                    tx1 = end_x if bx + block > end_x else bx + block
+                    ty1 = end_y if by + block > end_y else by + block
+                    if tx1 > tx0 and ty1 > ty0:
+                        tile = img[ty0:ty1, tx0:tx1]
+                        c = tile.mean(axis=(0, 1)).astype(np.uint8)
+                        tile[:] = c
+                    by += block
+                bx += block
         elif method == "black_bar":
             img[y:y+h, x:x+w] = (0, 0, 0)
         else:
