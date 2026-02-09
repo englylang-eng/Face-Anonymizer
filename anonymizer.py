@@ -6,6 +6,8 @@ import subprocess
 from typing import Tuple, List
 import numpy as np
 
+cv2.setUseOptimized(True)
+
 def load_cascade():
     cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
     face_cascade = cv2.CascadeClassifier(cascade_path)
@@ -101,7 +103,7 @@ def _mux_audio_with_ffmpeg(video_no_audio: str, source_with_audio: str, final_ou
         return False
     return proc.returncode == 0 and os.path.exists(final_out) and os.path.getsize(final_out) > 0
 
-def process_video(input_path: str, output_path: str, method: str = "blur", intensity: int = 30) -> Tuple[str, int]:
+def process_video(input_path: str, output_path: str, method: str = "blur", intensity: int = 30, fast: bool = False) -> Tuple[str, int]:
     if not os.path.exists(input_path):
         print(f"Error: Video file not found at {input_path}")
         return "", 0
@@ -122,16 +124,70 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
         writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     face_cascade = load_cascade()
     total_faces = 0
+    target_detect_width = 480 if fast else 640
+    detect_every = 3 if fast else 2
+    frame_index = 0
+    last_rects: List[Tuple[int,int,int,int]] = []
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        rects = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
+        scale = 1.0
+        if width > target_detect_width:
+            scale = float(target_detect_width) / float(width)
+        detect_gray = gray if scale >= 1.0 else cv2.resize(gray, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+        if frame_index % detect_every == 0:
+            use_roi = len(last_rects) > 0
+            rects = []
+            inv = (1.0 / scale) if scale > 0 else 1.0
+            if use_roi:
+                mx = min([x for (x, y, w, h) in last_rects])
+                my = min([y for (y, w, h) in [(r[1], r[2], r[3]) for r in last_rects]])
+                mx2 = max([x + w for (x, y, w, h) in last_rects])
+                my2 = max([y + h for (y, w, h) in [(r[1], r[2], r[3]) for r in last_rects]])
+                pad = int((0.12 if fast else 0.15) * width)
+                px = max(0, mx - pad)
+                py = max(0, my - pad)
+                ex = min(width, mx2 + pad)
+                ey = min(height, my2 + pad)
+                spx = int(round(px * scale))
+                spy = int(round(py * scale))
+                sex = int(round(ex * scale))
+                sey = int(round(ey * scale))
+                roi = detect_gray[spy:sey, spx:sex]
+                faces = face_cascade.detectMultiScale(
+                    roi,
+                    scaleFactor=1.1 if not fast else 1.2,
+                    minNeighbors=5 if not fast else 4,
+                    minSize=(int(30 * scale), int(30 * scale)),
+                )
+                for (x, y, w, h) in faces:
+                    rx = int(round((x + spx) * inv))
+                    ry = int(round((y + spy) * inv))
+                    rw = int(round(w * inv))
+                    rh = int(round(h * inv))
+                    rects.append((rx, ry, rw, rh))
+            else:
+                faces = face_cascade.detectMultiScale(
+                    detect_gray,
+                    scaleFactor=1.1 if not fast else 1.2,
+                    minNeighbors=5 if not fast else 4,
+                    minSize=(int(30 * scale), int(30 * scale)),
+                )
+                for (x, y, w, h) in faces:
+                    rx = int(round(x * inv))
+                    ry = int(round(y * inv))
+                    rw = int(round(w * inv))
+                    rh = int(round(h * inv))
+                    rects.append((rx, ry, rw, rh))
+            last_rects = rects
+        else:
+            rects = last_rects
         total_faces += len(rects)
         frame = _apply_anonymization(frame, rects, method=method, intensity=intensity)
         writer.write(frame)
+        frame_index += 1
     cap.release()
     writer.release()
     final = output_path

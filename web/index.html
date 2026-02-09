@@ -88,6 +88,7 @@
         border-radius: 9999px;
         outline: none;
         transition: background 160ms ease;
+        margin-top: 6px;
       }
       .dark #intensityRange { background: #374151; }
       #intensityRange::-webkit-slider-thumb {
@@ -233,6 +234,43 @@
       #typeSelectBtn[aria-expanded="true"] .select-arrow { transform: translateY(-50%) rotate(180deg); }
       #typeSelect { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none; }
       #typeSelect::-ms-expand { display: none; }
+      .control-label { display: inline-block; line-height: 1; margin-left: 0; }
+      #intensityLabel { position: relative; top: 3px; }
+      #fastModeToggle { accent-color: var(--color-primary) !important; }
+      #fastModeToggle:focus { outline: none; box-shadow: none; }
+      #fastModeToggle:focus-visible { outline: none; box-shadow: none; }
+      input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--color-primary) !important; }
+      #fastModeToggle {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 1px solid var(--color-primary);
+        border-radius: 0;
+        background-color: transparent;
+        background-image: none !important;
+        position: relative;
+        transition: background-color 160ms ease, border-color 160ms ease;
+      }
+      #fastModeToggle { border-color: #e5e7eb; }
+      .dark #fastModeToggle { border-color: #374151; }
+      #fastModeToggle:checked {
+        background-color: var(--color-primary);
+        background-image: none !important;
+      }
+      #fastModeToggle:checked::after {
+        content: "";
+        position: absolute;
+        width: 7px;
+        height: 10px;
+        border: 2px solid var(--on-primary);
+        border-top: none;
+        border-left: none;
+        transform: translate(-50%, -60%) rotate(45deg);
+        left: 50%;
+        top: 50%;
+      }
     </style>
   </head>
   <body class="bg-background-main text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
@@ -325,13 +363,13 @@
           </div>
         </div>
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 lg:p-8 shadow-sm glass-panel dark:bg-slate-800">
-          <div class="flex flex-col lg:flex-row items-center gap-8 lg:justify-between">
-            <div class="flex flex-col md:flex-row items-center gap-6 w-full lg:w-auto">
-              <div class="flex flex-col gap-1.5 w-full md:w-64">
-                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Anonymization Type</label>
+          <div class="flex flex-col lg:flex-row items-start gap-8 lg:justify-between">
+            <div class="flex flex-col md:flex-row items-start gap-6 w-full lg:w-auto">
+              <div class="flex flex-col gap-1.5 w-full md:w-56">
+                <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Anonymization Type</label>
                 <div id="typeSelectWrapper" class="relative">
                   <input id="typeSelect" type="hidden" value="blur" />
-                  <button id="typeSelectBtn" type="button" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 border rounded-lg py-3 pl-4 pr-12 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all relative flex items-center" aria-expanded="false" aria-haspopup="listbox" aria-controls="typeMenu">
+                  <button id="typeSelectBtn" type="button" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 border rounded-lg py-3 pl-3 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all relative flex items-center" aria-expanded="false" aria-haspopup="listbox" aria-controls="typeMenu">
                     <span id="typeSelectText">Gaussian Blur (Default)</span>
                     <span class="material-symbols-outlined select-arrow text-slate-500 dark:text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
                   </button>
@@ -342,16 +380,23 @@
                   </ul>
                 </div>
               </div>
-              <div class="flex flex-col gap-1.5 w-full md:w-48">
-                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Intensity</label>
+              <div class="flex flex-col gap-1.5 w-full md:w-40">
+                <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Intensity</label>
                 <div class="flex items-center gap-3 py-3">
                   <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="30"/>
                   <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">30%</span>
                 </div>
               </div>
+              <div class="flex flex-col gap-1.5 w-full md:w-64">
+                <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Fast Mode</label>
+                <div class="flex items-center gap-3 py-3">
+                  <input id="fastModeToggle" type="checkbox" class="focus:outline-none focus:ring-0 appearance-none"/>
+                  <span class="text-[15px] text-slate-600 dark:text-slate-300 whitespace-nowrap">Faster result, lower quality</span>
+                </div>
+              </div>
             </div>
             <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-              <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-on-primary rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+              <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-on-primary rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 border border-transparent">
                 <img id="anonymizeIcon" src="/web/anonymizer%20button%20icon.png" class="h-5 w-5 object-contain block" alt="Anonymize" />
                 <span id="anonymizeText" class="leading-none">Anonymize Now</span>
               </button>
@@ -415,7 +460,16 @@
         btn.style.minWidth = w + 'px';
         btn.style.minHeight = h + 'px';
       }
-      requestAnimationFrame(() => lockButtonSize(anonymizeBtn));
+      function equalizeButtons() {
+        if (!anonymizeBtn || !clearBtn) return;
+        const ah = Math.round(anonymizeBtn.offsetHeight);
+        const ch = Math.round(clearBtn.offsetHeight);
+        const h = Math.max(ah, ch);
+        anonymizeBtn.style.minHeight = h + 'px';
+        clearBtn.style.minHeight = h + 'px';
+      }
+      requestAnimationFrame(equalizeButtons);
+      window.addEventListener('resize', () => { equalizeButtons(); });
       let busy = false;
       let currentAbortController = null;
       const logs = [];
@@ -736,8 +790,10 @@
           setTimeout(updateIntensityUI, 0);
         });
       }
+      
 
       clearBtn.addEventListener('click', () => {
+        const f = document.getElementById('fastModeToggle');
         const isDefault =
           selectedFile === null &&
           resultBlobUrl === null &&
@@ -745,7 +801,8 @@
           currentAbortController === null &&
           statusText && statusText.textContent === 'No file selected' &&
           typeSelect && typeSelect.value === 'blur' &&
-          intensityRange && String(intensityRange.value) === '30';
+          intensityRange && String(intensityRange.value) === '30' &&
+          (!f || f.checked === false);
         if (isDefault) {
           return;
         }
@@ -775,6 +832,10 @@
           intensityLabel.textContent = '30%';
           updateIntensityUI();
         }
+        try {
+          const f = document.getElementById('fastModeToggle');
+          if (f) f.checked = false;
+        } catch {}
         if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); resultBlobUrl = null; }
         toast('Cleared successfully', 'success', 2400);
       });
@@ -833,6 +894,7 @@
         if (!selectedFile) { toast('Please select a video first', 'warning', 2000); return; }
         let start = 0;
         let success = false;
+        let slowTimer = null;
         try {
           busy = true;
           setAnonymizeEnabled(false, true);
@@ -841,6 +903,18 @@
           fd.append('video', selectedFile);
           fd.append('type', typeSelect.value);
           fd.append('intensity', intensityRange.value);
+          try {
+            const f = document.getElementById('fastModeToggle');
+            if (f) fd.append('fast_mode', f.checked ? '1' : '0');
+          } catch {}
+          slowTimer = setTimeout(() => {
+            try {
+              const f = document.getElementById('fastModeToggle');
+              if (busy && (!f || !f.checked)) {
+                toast("If processing feels too slow, cancel and enable Fast Mode for quicker results (lower quality).", 'info', 8000);
+              }
+            } catch {}
+          }, 60000);
           currentAbortController = new AbortController();
           const resp = await fetch(`${API_BASE}/api/anonymize_video`, { method: 'POST', body: fd, signal: currentAbortController.signal });
           if (!resp.ok) {
@@ -863,6 +937,7 @@
             toast(err && err.message ? err.message : 'Error processing video', 'error', 6000);
           }
         } finally {
+          if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
           currentAbortController = null;
           const end = performance.now();
           const diff = MIN_PROCESS_MS - (end - start);

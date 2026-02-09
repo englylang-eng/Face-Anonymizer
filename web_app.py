@@ -128,13 +128,15 @@ def anonymize_video():
         intensity = int(request.form.get("intensity", "30"))
     except:
         intensity = 30
+    fast_flag = request.form.get("fast_mode", "0")
+    fast = True if str(fast_flag).lower() in ("1","true","yes","on") else False
     with NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_in:
         file.save(tmp_in)
         tmp_in_path = tmp_in.name
     with NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_out:
         out_path = tmp_out.name
     try:
-        output_path, total_faces = process_video(tmp_in_path, out_path, method=method, intensity=intensity)
+        output_path, total_faces = process_video(tmp_in_path, out_path, method=method, intensity=intensity, fast=fast)
         if not output_path:
             return jsonify({"error": "processing failed"}), 500
         if total_faces == 0:
