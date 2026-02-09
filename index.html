@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Face Anonymizer Tool Dashboard</title>
+    <title>Badger Face Anonymizer</title>
+    <link id="favicon" rel="icon" href="logo-white.png" type="image/png"/>
+    <link rel="shortcut icon" href="logo-white.png" type="image/png"/>
+    <link rel="apple-touch-icon" href="logo-white.png"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -13,7 +16,7 @@
         theme: {
           extend: {
             colors: {
-              "primary": "#136dec",
+              "primary": "#000000",
               "background-main": "#FFFFFF",
               "card-border": "#e5e7eb",
             },
@@ -25,6 +28,10 @@
     </script>
     <style>
       body { font-family: "Space Grotesk", sans-serif; }
+      :root { --color-primary: #000000; }
+      .dark { --color-primary: #ffffff; }
+      :root { --on-primary: #ffffff; }
+      .dark { --on-primary: #000000; }
       .custom-dashed-border {
         border: 2px dashed #e5e7eb;
         border-radius: 0.5rem;
@@ -60,6 +67,66 @@
         object-fit: contain;
         border-radius: 0.5rem;
       }
+      #headerLogo { transition: filter 160ms ease; }
+      .dark #headerLogo { filter: invert(1); }
+      @media (prefers-color-scheme: dark) {
+        #anonymizeIcon { filter: invert(0); }
+      }
+      @media (prefers-color-scheme: light) {
+        #anonymizeIcon { filter: invert(1); }
+      }
+      #themeHeaderToggle { cursor: pointer; }
+      #anonymizeIcon { transition: filter 160ms ease; filter: invert(1); }
+      .dark #anonymizeIcon { filter: invert(0); }
+      #procDots { display: inline-block; width: 3ch; margin-left: -0.2ch; }
+      #procDots .dot { visibility: hidden; }
+      #intensityRange {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 9999px;
+        outline: none;
+        transition: background 160ms ease;
+      }
+      .dark #intensityRange { background: #374151; }
+      #intensityRange::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        margin-top: -4px;
+        transition: transform 120ms ease, box-shadow 120ms ease;
+        transform: translateY(-4px);
+      }
+      .dark #intensityRange::-webkit-slider-thumb { }
+      #intensityRange:hover::-webkit-slider-thumb { transform: translateY(-4px) scale(1.06); }
+      #intensityRange:active::-webkit-slider-thumb { transform: translateY(-4px) scale(1.1); }
+      #intensityRange::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        transition: transform 120ms ease, box-shadow 120ms ease;
+        transform: translateY(-4px);
+      }
+      .dark #intensityRange::-moz-range-thumb { }
+      #intensityRange:hover::-moz-range-thumb { transform: translateY(-4px) scale(1.06); }
+      #intensityRange:active::-moz-range-thumb { transform: translateY(-4px) scale(1.1); }
+      #intensityRange::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 9999px;
+      }
+      #intensityRange::-moz-range-track {
+        height: 6px;
+        border-radius: 9999px;
+        background: transparent;
+      }
+      .drop-active { border-color: var(--color-primary); background: rgba(0, 0, 0, 0.06); }
+      .dark .drop-active { border-color: var(--color-primary); background: rgba(255, 255, 255, 0.12); }
+      .drop-active .size-16 { transform: scale(1.06); }
       .dark .custom-dashed-border { border-color: #374151; }
       .dark .img-box { border-color: #374151; background: #0f172a; }
       .log-panel {
@@ -82,7 +149,7 @@
       .toast-exit { transform: translateY(0); opacity: 1; }
       .toast-exit-active { transform: translateY(-8px); opacity: 0; transition: transform 200ms ease, opacity 200ms ease; }
       .toast { outline: none; }
-      .toast:focus-visible { box-shadow: 0 0 0 2px rgba(19, 109, 236, 0.35); border-radius: 0.5rem; }
+      .toast:focus-visible { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35); border-radius: 0.5rem; }
       .toast-body { word-break: break-word; }
       .bg-success { background-color: #52c41a; }
       .text-success { color: #52c41a; }
@@ -90,24 +157,98 @@
       .text-error { color: #ff4d4f; }
       .bg-warning { background-color: #faad14; }
       .text-warning { color: #faad14; }
-      .bg-info { background-color: #136dec; }
-      .text-info { color: #136dec; }
+      .bg-info { background-color: var(--color-primary); }
+      .text-info { color: var(--color-primary); }
+      .bg-primary { background-color: var(--color-primary) !important; }
+      .text-primary { color: var(--color-primary) !important; }
+      .text-on-primary { color: var(--on-primary) !important; }
+      button:focus, button:focus-visible { outline: none !important; box-shadow: none !important; }
+      #sourceTabs button:focus, #sourceTabs button:focus-visible { outline: none !important; box-shadow: none !important; }
+      #themeBtn:focus, #themeBtn:focus-visible { outline: none !important; box-shadow: none !important; }
+      .tab-indicator {
+        transition:
+          left 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          top 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          background-color 200ms ease;
+        will-change: left, top, width, height;
+      }
+      #typeMenu {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(100% + 6px);
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+        display: none;
+        z-index: 50;
+        overflow: hidden;
+      }
+      .dark #typeMenu {
+        background: #0b1220;
+        border-color: #374151;
+        box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.35), 0 3px 6px -4px rgba(0, 0, 0, 0.45), 0 9px 28px 8px rgba(0, 0, 0, 0.35);
+      }
+      .select-open #typeMenu { display: block; }
+      #typeMenu li {
+        padding: 10px 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+      }
+      .dark #typeMenu li { color: #e5e7eb; }
+      #typeMenu li:hover, #typeMenu li:focus {
+        background-color: var(--color-primary);
+        color: var(--on-primary);
+      }
+      @keyframes sunToggle {
+        0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
+        50% { transform: rotate(15deg) scale(1.1); opacity: 1; }
+        100% { transform: rotate(0deg) scale(1); opacity: 1; }
+      }
+      @keyframes moonToggle {
+        0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
+        50% { transform: rotate(-15deg) scale(1.1); opacity: 1; }
+        100% { transform: rotate(0deg) scale(1); opacity: 1; }
+      }
+      .sun-toggle-anim { animation: sunToggle 320ms ease-out; }
+      .moon-toggle-anim { animation: moonToggle 320ms ease-out; }
+      @keyframes themeRipple {
+        0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.24); }
+        100% { box-shadow: 0 0 0 12px rgba(0, 0, 0, 0); }
+      }
+      .theme-ripple { animation: themeRipple 420ms ease-out; }
+      html, body, header, main, .img-box, .glass-panel {
+        transition:
+          background-color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          border-color 320ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .select-arrow { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; transform: translateY(-50%) rotate(0deg); }
+      .select-open .select-arrow { transform: translateY(-50%) rotate(180deg); }
+      #typeSelectBtn[aria-expanded="true"] .select-arrow { transform: translateY(-50%) rotate(180deg); }
+      #typeSelect { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: none; }
+      #typeSelect::-ms-expand { display: none; }
     </style>
   </head>
   <body class="bg-background-main text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
     <div class="layout-container flex h-full grow flex-col">
-      <header class="grid grid-cols-[1fr_auto_1fr] items-center whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-700 px-6 lg:px-10 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
-        <div class="flex items-center gap-3">
-          <div class="p-2 bg-primary rounded-lg text-white flex items-center justify-center">
-            <span class="material-symbols-outlined">face_retouching_off</span>
+      <header class="grid grid-cols-[1fr_auto_1fr] items-center whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-700 px-12 lg:px-20 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div id="themeHeaderToggle" class="flex items-center gap-1">
+          <div id="logoContainer" class="p-2 flex items-center justify-center">
+            <img id="headerLogo" src="logo.png" alt="Face Anonymizer" class="h-12 w-12 object-contain" title="Face Anonymizer" />
           </div>
           <h2 class="text-xl font-bold leading-tight tracking-tight text-slate-900 dark:text-slate-100">Face Anonymizer</h2>
         </div>
         <div class="flex items-center justify-center justify-self-center">
           <div id="sourceTabs" class="relative flex items-center gap-2 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 p-1 shadow-sm backdrop-blur-sm transition-colors">
-            <span id="tabIndicator" class="absolute rounded-full bg-primary/20 dark:bg-primary/30 tab-indicator" style="z-index:0; top:4px; left:4px; height:32px; width:calc(50% - 4px);"></span>
-            <button id="tabImage" class="px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10">Image</button>
-            <button id="tabVideo" class="px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10">Video</button>
+            <span id="tabIndicator" class="absolute rounded-full bg-primary tab-indicator" style="z-index:0; top:4px; left:4px; height:32px; width:calc(50% - 4px);"></span>
+            <button id="tabImage" class="px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors">Image</button>
+            <button id="tabVideo" class="px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors">Video</button>
           </div>
         </div>
         <div class="flex items-center gap-4 justify-self-end">
@@ -118,7 +259,7 @@
       </header>
       <main class="max-w-[1200px] mx-auto w-full p-4 lg:p-8">
         <div class="flex flex-col gap-1.5 mb-2">
-          <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Privacy Guard Dashboard</h1>
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Badger Face Anonymizer</h1>
           <p class="text-slate-600 text-base max-w-xl mb-4">
             High-performance face detection and obfuscation tool. Securely process images and videos on your device — no cloud upload.
           </p>
@@ -142,10 +283,10 @@
                     <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag image to upload</p>
                     <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
                   </div>
-                  <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                  <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
                     Browse Files
                   </button>
-                  <input id="fileInput" type="file" accept="image/*" class="hidden" />
+                  <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
                 </div>
               </div>
               <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
@@ -164,7 +305,7 @@
                 <span class="material-symbols-outlined text-green-600">verified_user</span>
                 <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Anonymized Output</h3>
               </div>
-              <span class="text-xs font-semibold bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full uppercase tracking-wider">Result</span>
+              <span class="text-xs font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-full uppercase tracking-wider">Result</span>
             </div>
             <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[360px] glass-panel dark:bg-slate-800">
               <div class="flex-1 p-8 flex flex-col relative overflow-hidden group">
@@ -188,12 +329,17 @@
             <div class="flex flex-col md:flex-row items-center gap-6 w-full lg:w-auto">
               <div class="flex flex-col gap-1.5 w-full md:w-64">
                 <label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Anonymization Type</label>
-                <div class="relative">
-                  <select id="typeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg py-3 pl-4 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary appearance-none transition-all">
-                    <option value="blur">Gaussian Blur (Default)</option>
-                    <option value="pixelate">Pixelation Grid</option>
-                    <option value="black_bar">Censored Black Bar</option>
-                  </select>
+                <div id="typeSelectWrapper" class="relative">
+                  <input id="typeSelect" type="hidden" value="blur" />
+                  <button id="typeSelectBtn" type="button" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 border rounded-lg py-3 pl-4 pr-12 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all relative flex items-center" aria-expanded="false" aria-haspopup="listbox" aria-controls="typeMenu">
+                    <span id="typeSelectText">Gaussian Blur (Default)</span>
+                    <span class="material-symbols-outlined select-arrow text-slate-500 dark:text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
+                  </button>
+                  <ul id="typeMenu" role="listbox" aria-label="Anonymization Type">
+                    <li role="option" tabindex="0" data-value="blur">Gaussian Blur (Default)</li>
+                    <li role="option" tabindex="0" data-value="pixelate">Pixelation Grid</li>
+                    <li role="option" tabindex="0" data-value="black_bar">Censored Black Bar</li>
+                  </ul>
                 </div>
               </div>
               <div class="flex flex-col gap-1.5 w-full md:w-48">
@@ -205,9 +351,9 @@
               </div>
             </div>
             <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-              <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
-                <span class="material-symbols-outlined">auto_fix_high</span>
-                Anonymize Now
+              <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-on-primary rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                <img id="anonymizeIcon" src="/web/anonymizer%20button%20icon.png" class="h-5 w-5 object-contain block" alt="Anonymize" />
+                <span id="anonymizeText" class="leading-none">Anonymize Now</span>
               </button>
               <button id="clearBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold transition-all dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
                 <span class="material-symbols-outlined text-[20px]">restart_alt</span>
@@ -236,6 +382,7 @@
     <script>
       const themeBtn = document.getElementById('themeBtn');
       const themeIcon = document.getElementById('themeIcon');
+      const themeHeaderToggle = document.getElementById('themeHeaderToggle');
       const fileInput = document.getElementById('fileInput');
       const browseBtn = document.getElementById('browseBtn');
       const dropArea = document.getElementById('dropArea');
@@ -259,6 +406,16 @@
       let selectedFile = null;
       let resultBlobUrl = null;
       let reprocTimer = null;
+      let processingAnimTimer = null;
+      let processingAnimStep = 0;
+      function lockButtonSize(btn) {
+        if (!btn) return;
+        const w = Math.round(btn.offsetWidth);
+        const h = Math.round(btn.offsetHeight);
+        btn.style.minWidth = w + 'px';
+        btn.style.minHeight = h + 'px';
+      }
+      requestAnimationFrame(() => lockButtonSize(anonymizeBtn));
       let busy = false;
       let currentAbortController = null;
       const logs = [];
@@ -268,6 +425,58 @@
       const metricTime = () => document.getElementById('metricTime');
       const metricType = () => document.getElementById('metricType');
       const metricStatus = () => document.getElementById('metricStatus');
+      const ALLOWED_IMAGE_TYPES = ['image/jpeg','image/png','image/webp'];
+      const ALLOWED_IMAGE_EXT = ['.jpg','.jpeg','.png','.webp'];
+      const ALLOWED_VIDEO_TYPES = ['video/mp4','video/webm'];
+      const ALLOWED_VIDEO_EXT = ['.mp4','.webm'];
+      function extOf(name) { const i = name.lastIndexOf('.'); return i >= 0 ? name.slice(i).toLowerCase() : ''; }
+      function canPlayVideoType(t) { const v = document.createElement('video'); return !!(v.canPlayType && v.canPlayType(t)); }
+      function readHead(file, n = 32) {
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onerror = () => reject(new Error('Read error'));
+          r.onload = () => resolve(new Uint8Array(r.result));
+          r.readAsArrayBuffer(file.slice(0, n));
+        });
+      }
+      async function sniffImage(file) {
+        try {
+          const b = await readHead(file, 16);
+          if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xD8) return true;
+          if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47 && b[4] === 0x0D && b[5] === 0x0A && b[6] === 0x1A && b[7] === 0x0A) return true;
+          if (b.length >= 12 && String.fromCharCode(b[0],b[1],b[2],b[3]) === 'RIFF' && String.fromCharCode(b[8],b[9],b[10],b[11]) === 'WEBP') return true;
+          return false;
+        } catch { return false; }
+      }
+      async function sniffVideo(file) {
+        try {
+          const b = await readHead(file, 64);
+          if (b.length >= 8 && String.fromCharCode(b[4],b[5],b[6],b[7]) === 'ftyp') return true;
+          const s = String.fromCharCode(...b);
+          if (s.toLowerCase().includes('webm')) return true;
+          return false;
+        } catch { return false; }
+      }
+      async function validateFile(file, mode) {
+        if (!file) return { ok: false, msg: 'No file provided' };
+        const ext = extOf(file.name);
+        if (mode === 'image') {
+          if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return { ok: false, msg: 'Unsupported image type' };
+          if (!ALLOWED_IMAGE_EXT.includes(ext)) return { ok: false, msg: 'Unsupported image extension' };
+          if (file.size > 10 * 1024 * 1024) return { ok: false, msg: 'File too large (max 10MB)' };
+          const ok = await sniffImage(file);
+          if (!ok) return { ok: false, msg: 'Invalid or corrupted image' };
+          return { ok: true };
+        } else {
+          if (!ALLOWED_VIDEO_TYPES.includes(file.type)) return { ok: false, msg: 'Unsupported video type' };
+          if (!ALLOWED_VIDEO_EXT.includes(ext)) return { ok: false, msg: 'Unsupported video extension' };
+          if (file.size > 200 * 1024 * 1024) return { ok: false, msg: 'Video too large (max 200MB)' };
+          if (!canPlayVideoType(file.type)) return { ok: false, msg: 'Browser cannot play this video type' };
+          const ok = await sniffVideo(file);
+          if (!ok) return { ok: false, msg: 'Invalid or corrupted video' };
+          return { ok: true };
+        }
+      }
 
       function applyTheme(t) {
         const isDark = t === 'dark';
@@ -283,6 +492,13 @@
         }
         applyTheme(mode);
       }
+      if (window.matchMedia) {
+        const mm = window.matchMedia('(prefers-color-scheme: dark)');
+        mm.addEventListener('change', (e) => {
+          const saved = localStorage.getItem('theme');
+          if (!saved) applyTheme(e.matches ? 'dark' : 'light');
+        });
+      }
       themeBtn.addEventListener('click', () => {
         const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
         localStorage.setItem('theme', next);
@@ -293,6 +509,11 @@
         themeBtn.classList.add('theme-ripple');
         setTimeout(() => themeBtn.classList.remove('theme-ripple'), 420);
       });
+      if (themeHeaderToggle) {
+        themeHeaderToggle.addEventListener('click', () => {
+          location.reload();
+        });
+      }
       initTheme();
       function bindUploadControls() {
         const btn = document.getElementById('browseBtn');
@@ -305,6 +526,20 @@
         } else {
           if (vbtn) vbtn.addEventListener('click', () => vinput && vinput.click());
           if (vinput) vinput.addEventListener('change', (e) => handleFiles(e.target.files));
+        }
+        if (dropArea) {
+          const onDrag = (ev) => { ev.preventDefault(); ev.stopPropagation(); dropArea.classList.add('drop-active'); };
+          dropArea.addEventListener('dragenter', onDrag);
+          dropArea.addEventListener('dragover', onDrag);
+          dropArea.addEventListener('dragleave', (ev) => { ev.preventDefault(); ev.stopPropagation(); dropArea.classList.remove('drop-active'); });
+          dropArea.addEventListener('drop', async (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            dropArea.classList.remove('drop-active');
+            const dt = ev.dataTransfer;
+            if (!dt || !dt.files || !dt.files.length) return;
+            await handleFiles(dt.files);
+          });
         }
       }
       bindUploadControls();
@@ -323,14 +558,16 @@
       dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
       function positionTabIndicator(btn) {
         if (!tabIndicator || !btn || !sourceTabs) return;
-        const left = btn.offsetLeft;
-        const top = btn.offsetTop;
-        const width = btn.offsetWidth;
-        const height = btn.offsetHeight;
-        tabIndicator.style.left = `${left}px`;
-        tabIndicator.style.top = `${top}px`;
-        tabIndicator.style.width = `${width}px`;
-        tabIndicator.style.height = `${height}px`;
+        const left = Math.round(btn.offsetLeft);
+        const top = Math.round(btn.offsetTop);
+        const width = Math.round(btn.offsetWidth);
+        const height = Math.round(btn.offsetHeight);
+        requestAnimationFrame(() => {
+          tabIndicator.style.left = `${left}px`;
+          tabIndicator.style.top = `${top}px`;
+          tabIndicator.style.width = `${width}px`;
+          tabIndicator.style.height = `${height}px`;
+        });
       }
       function updateMetrics({ faces = null, ms = null, type = '', status = '' }) {
         if (metricFaces()) metricFaces().textContent = faces === null ? '—' : String(faces);
@@ -352,11 +589,11 @@
         dropArea.innerHTML = imgActive ? renderDropAreaContent() : renderVideoPlaceholderContent();
         bindUploadControls();
         tabImage.className = imgActive
-          ? 'px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10'
-          : 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10';
+          ? 'px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors'
+          : 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors';
         tabVideo.className = imgActive
-          ? 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10'
-          : 'px-6 py-2 rounded-full font-bold text-sm bg-primary text-white relative z-10';
+          ? 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors'
+          : 'px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors';
         positionTabIndicator(imgActive ? tabImage : tabVideo);
         statusText.textContent = 'No file selected';
         // reset result box placeholder to match new source
@@ -374,35 +611,178 @@
       tabImage.addEventListener('click', () => setSource('image'));
       tabVideo.addEventListener('click', () => setSource('video'));
       window.addEventListener('resize', () => positionTabIndicator(source === 'image' ? tabImage : tabVideo));
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (btn) { try { btn.blur(); } catch {} }
+      });
+      const STATIC_BASE = (function() {
+        try {
+          const host = String(location.hostname || '');
+          return host.endsWith('github.io') ? '' : '/web';
+        } catch { return '/web'; }
+      })();
+      const API_BASE = (function() {
+        try {
+          const v = localStorage.getItem('api_base') || '';
+          return v ? v.replace(/\/+$/,'') : '';
+        } catch { return ''; }
+      })();
+      (function ensureLogo() {
+        const img = document.getElementById('headerLogo');
+        const container = document.getElementById('logoContainer');
+        if (!img || !container) return;
+        img.addEventListener('error', () => {
+          img.onerror = null;
+          container.innerHTML = '<span class="material-symbols-outlined text-primary">face_retouching_off</span>';
+        });
+      })();
+      (function ensureAnonymizeIcon() {
+        const icon = document.getElementById('anonymizeIcon');
+        if (!icon) return;
+        icon.addEventListener('error', () => {
+          try {
+            const btn = document.getElementById('anonymizeBtn');
+            if (btn) btn.innerHTML = `<span class="material-symbols-outlined">auto_fix_high</span> Anonymize Now`;
+          } catch {}
+        });
+        try {
+          const base = `${STATIC_BASE}/anonymizer%20button%20icon.png`;
+          icon.src = `${base}?v=${Date.now()}`;
+        } catch {}
+      })();
+      async function refreshLogo() {
+        const img = document.getElementById('headerLogo');
+        if (!img) return;
+        const base = `${STATIC_BASE}/logo.png`;
+        const v = Date.now();
+        img.src = `${base}?v=${v}`;
+      }
+      refreshLogo();
+      (function fixFavicon() {
+        try {
+          const links = [
+            document.querySelector('link[rel="icon"]#favicon'),
+            document.querySelector('link[rel="shortcut icon"]'),
+            document.querySelector('link[rel="apple-touch-icon"]'),
+          ].filter(Boolean);
+          for (const el of links) {
+            el.href = `${STATIC_BASE}/logo-white.png`;
+          }
+        } catch {}
+      })();
 
       intensityRange.addEventListener('input', () => {
-        intensityLabel.textContent = intensityRange.value + '%';
+        updateIntensityUI();
+        const val = String(intensityRange.value);
+        if (statusText) statusText.textContent = `Intensity: ${val}%`;
+        if (resultBlobUrl) setDownloadEnabled(false);
       });
+      intensityRange.addEventListener('change', () => {
+        updateIntensityUI();
+        const val = String(intensityRange.value);
+        if (statusText) statusText.textContent = `Intensity: ${val}%`;
+      });
+      function updateIntensityUI() {
+        const v = Number(intensityRange.value);
+        intensityLabel.textContent = v + '%';
+        const min = Number(intensityRange.min || 0);
+        const max = Number(intensityRange.max || 100);
+        const ratio = Math.max(0, Math.min(1, (v - min) / (max - min)));
+        const rect = intensityRange.getBoundingClientRect();
+        const width = Math.max(0, rect.width || intensityRange.offsetWidth || 0);
+        const x = Math.round(ratio * width);
+        const isDark = document.documentElement.classList.contains('dark');
+        const base = isDark ? '#374151' : '#e5e7eb';
+        const pri = isDark ? '#ffffff' : '#000000';
+        intensityRange.style.background = `linear-gradient(to right, ${pri} ${x}px, ${base} ${x}px)`;
+      }
+      const typeSelectWrapper = document.getElementById('typeSelectWrapper');
+      const typeSelectBtn = document.getElementById('typeSelectBtn');
+      const typeSelectText = document.getElementById('typeSelectText');
+      const typeMenu = document.getElementById('typeMenu');
+      const TYPE_LABELS = { blur: 'Gaussian Blur (Default)', pixelate: 'Pixelation Grid', black_bar: 'Censored Black Bar' };
       typeSelect.addEventListener('change', () => {
-        const txt = typeSelect.options[typeSelect.selectedIndex].text;
+        const txt = TYPE_LABELS[typeSelect.value] || typeSelect.value;
         statusText.textContent = `Type: ${txt}`;
       });
+      if (typeSelectWrapper && typeSelectBtn && typeMenu && typeSelectText && typeSelect) {
+        const closeMenu = () => { typeSelectWrapper.classList.remove('select-open'); typeSelectBtn.setAttribute('aria-expanded','false'); };
+        const openMenu = () => { typeSelectWrapper.classList.add('select-open'); typeSelectBtn.setAttribute('aria-expanded','true'); };
+        typeSelectBtn.addEventListener('click', () => {
+          if (typeSelectWrapper.classList.contains('select-open')) closeMenu(); else openMenu();
+        });
+        document.addEventListener('mousedown', (e) => { if (!typeSelectWrapper.contains(e.target)) closeMenu(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+        typeMenu.querySelectorAll('li').forEach(li => {
+          li.addEventListener('click', () => {
+            const val = li.getAttribute('data-value');
+            typeSelect.value = val;
+            typeSelectText.textContent = TYPE_LABELS[val] || val;
+            typeSelect.dispatchEvent(new Event('change'));
+            closeMenu();
+          });
+          li.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              li.click();
+            }
+          });
+        });
+      }
+      updateIntensityUI();
+      window.addEventListener('resize', updateIntensityUI);
+      if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+          setTimeout(updateIntensityUI, 0);
+        });
+      }
 
       clearBtn.addEventListener('click', () => {
+        const isDefault =
+          selectedFile === null &&
+          resultBlobUrl === null &&
+          !busy &&
+          currentAbortController === null &&
+          statusText && statusText.textContent === 'No file selected' &&
+          typeSelect && typeSelect.value === 'blur' &&
+          intensityRange && String(intensityRange.value) === '30';
+        if (isDefault) {
+          return;
+        }
         selectedFile = null;
         if (reprocTimer) { clearTimeout(reprocTimer); reprocTimer = null; }
         if (currentAbortController) { try { currentAbortController.abort(); } catch {} currentAbortController = null; }
         busy = false;
-        dropArea.innerHTML = renderDropAreaContent();
+        dropArea.innerHTML = source === 'image' ? renderDropAreaContent() : renderVideoPlaceholderContent();
         bindUploadControls();
-        resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
+        if (source === 'image') {
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
+        } else {
+          resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed video will appear here after clicking 'Anonymize'</p>`;
+        }
         statusText.textContent = 'No file selected';
         
         setDownloadEnabled(false);
         setAnonymizeEnabled(false, false);
         updateMetrics({ faces: null, ms: null, type: '', status: '' });
+        // reset controls
+        if (typeSelect && typeSelectText) {
+          typeSelect.value = 'blur';
+          typeSelectText.textContent = 'Gaussian Blur (Default)';
+        }
+        if (intensityRange && intensityLabel) {
+          intensityRange.value = 30;
+          intensityLabel.textContent = '30%';
+          updateIntensityUI();
+        }
         if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); resultBlobUrl = null; }
+        toast('Cleared successfully', 'success', 2400);
       });
 
       anonymizeBtn.addEventListener('click', () => source === 'image' ? runAnonymize() : runAnonymizeVideo());
       async function runAnonymize() {
         if (busy) return;
-        if (!selectedFile) { toast('Please select an image first', 'warning', 4000); return; }
+        if (!selectedFile) { toast('Please upload an image first', 'warning', 2000); return; }
         let start = 0;
         let success = false;
         try {
@@ -414,7 +794,7 @@
           fd.append('type', typeSelect.value);
           fd.append('intensity', intensityRange.value);
           currentAbortController = new AbortController();
-          const resp = await fetch('/api/anonymize', { method: 'POST', body: fd, signal: currentAbortController.signal });
+          const resp = await fetch(`${API_BASE}/api/anonymize`, { method: 'POST', body: fd, signal: currentAbortController.signal });
           if (!resp.ok) {
             const ct = resp.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
@@ -426,7 +806,6 @@
           const blob = await resp.blob();
           if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); }
           resultBlobUrl = URL.createObjectURL(blob);
-          toast('Anonymized image ready', 'success', 4000);
           success = true;
         } catch (err) {
           if (err && err.name === 'AbortError') {
@@ -443,6 +822,7 @@
           if (success && resultBlobUrl) {
             resultBox.innerHTML = `<img class="bg-blur" src="${resultBlobUrl}" alt=""><img class="img-main" src="${resultBlobUrl}" alt="Anonymized">`;
             setDownloadEnabled(true);
+            toast('Anonymized image ready', 'success', 2000);
           }
           busy = false;
           setAnonymizeEnabled(true, false);
@@ -450,7 +830,7 @@
       }
       async function runAnonymizeVideo() {
         if (busy) return;
-        if (!selectedFile) { toast('Please select a video first', 'warning', 4000); return; }
+        if (!selectedFile) { toast('Please select a video first', 'warning', 2000); return; }
         let start = 0;
         let success = false;
         try {
@@ -462,7 +842,7 @@
           fd.append('type', typeSelect.value);
           fd.append('intensity', intensityRange.value);
           currentAbortController = new AbortController();
-          const resp = await fetch('/api/anonymize_video', { method: 'POST', body: fd, signal: currentAbortController.signal });
+          const resp = await fetch(`${API_BASE}/api/anonymize_video`, { method: 'POST', body: fd, signal: currentAbortController.signal });
           if (!resp.ok) {
             const ct = resp.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
@@ -474,7 +854,6 @@
           const blob = await resp.blob();
           if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); }
           resultBlobUrl = URL.createObjectURL(blob);
-          toast('Anonymized video ready', 'success', 4000);
           success = true;
         } catch (err) {
           if (err && err.name === 'AbortError') {
@@ -497,6 +876,7 @@
               toast('Unable to preview video (codec or format not supported)', 'error', 6000);
             });
             setDownloadEnabled(true);
+            toast('Anonymized video ready', 'success', 2000);
           }
           busy = false;
           setAnonymizeEnabled(true, false);
@@ -510,10 +890,19 @@
       function setAnonymizeEnabled(enabled, processing) {
         if (enabled) {
           anonymizeBtn.classList.remove('cursor-not-allowed','opacity-50');
-          anonymizeBtn.innerHTML = `<span class="material-symbols-outlined">auto_fix_high</span> Anonymize Now`;
+          anonymizeBtn.innerHTML = `<img id="anonymizeIcon" src="/web/anonymizer%20button%20icon.png" class="h-5 w-5 object-contain block" alt="Anonymize"> <span id="anonymizeText" class="leading-none">Anonymize Now</span>`;
+          if (processingAnimTimer) { clearInterval(processingAnimTimer); processingAnimTimer = null; }
+          processingAnimStep = 0;
         } else {
           if (processing) {
-            anonymizeBtn.innerHTML = `Processing...`;
+            processingAnimStep = 0;
+            anonymizeBtn.innerHTML = `Processing<span id="procDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>`;
+            if (processingAnimTimer) { clearInterval(processingAnimTimer); }
+            processingAnimTimer = setInterval(() => {
+              processingAnimStep = (processingAnimStep + 1) % 3;
+              const dots = anonymizeBtn.querySelectorAll('#procDots .dot');
+              dots.forEach((d, i) => { d.style.visibility = i <= processingAnimStep ? 'visible' : 'hidden'; });
+            }, 500);
           }
           anonymizeBtn.classList.add('cursor-not-allowed','opacity-50');
         }
@@ -521,45 +910,36 @@
 
       
 
-      function toast(msg, type = 'info', duration = 4000) {
+      function toast(msg, type = 'info', duration = 2000) {
         statusText.textContent = msg;
         showToast({ title: type === 'error' ? 'Error' : type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : 'Info', message: msg, type, duration });
       }
 
-      function handleFiles(files) {
+      async function handleFiles(files) {
         if (!files || !files.length) return;
         const f = files[0];
-        if (source === 'image') {
-          if (f.size > 10 * 1024 * 1024) {
-            const msg = 'File too large (max 10MB)';
-            logMsg(msg, 'warn');
-            toast(msg, 'warning', 5000);
-            return;
-          }
-          selectedFile = f;
-          const url = URL.createObjectURL(f);
-          logMsg(`Selected file: ${f.name} (${f.size} bytes)`, 'info');
+        const mode = source === 'image' ? 'image' : 'video';
+        const res = await validateFile(f, mode);
+        if (!res.ok) {
+          logMsg(res.msg, 'warn');
+          toast(res.msg, 'warning', 5000);
+          return;
+        }
+        selectedFile = f;
+        const url = URL.createObjectURL(f);
+        if (mode === 'image') {
           dropArea.innerHTML = `<img class="bg-blur" src="${url}" alt=""><img class="img-main" src="${url}" alt="Original">`;
           statusText.textContent = f.name;
           resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
-          setDownloadEnabled(false);
-          setAnonymizeEnabled(true, false);
         } else {
-          if (f.size > 200 * 1024 * 1024) {
-            const msg = 'Video too large (max 200MB)';
-            logMsg(msg, 'warn');
-            toast(msg, 'warning', 5000);
-            return;
-          }
-          selectedFile = f;
-          const url = URL.createObjectURL(f);
-          logMsg(`Selected video: ${f.name} (${f.size} bytes)`, 'info');
           dropArea.innerHTML = `<video class="img-main w-full h-full" src="${url}" controls></video>`;
           statusText.textContent = f.name;
           resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed video will appear here after clicking 'Anonymize'</p>`;
-          setDownloadEnabled(false);
-          setAnonymizeEnabled(true, false);
         }
+        setDownloadEnabled(false);
+        setAnonymizeEnabled(true, false);
+        const kind = mode === 'image' ? 'Image' : 'Video';
+        toast(`${kind} uploaded`, 'success', 1600);
       }
 
       
@@ -573,7 +953,7 @@
             <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag image to upload</p>
             <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
           </div>
-          <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
+          <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
             Browse Files
           </button>
           <input id="fileInput" type="file" accept="image/*" class="hidden" />
@@ -588,15 +968,23 @@
             <p class="text-base font-semibold text-slate-900 dark:text-slate-100">Click or drag video to upload</p>
             <p class="text-sm text-slate-500 mt-1">Supports MP4 or WEBM (Max ~200MB)</p>
           </div>
-          <button id="browseVideoBtn" class="mt-2 bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
+          <button id="browseVideoBtn" class="mt-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
             Browse Videos
           </button>
-          <input id="videoInput" type="file" accept="video/*" class="hidden" />
+          <input id="videoInput" type="file" accept="video/mp4,video/webm" class="hidden" />
         `;
       }
       function showToast({ title, message, type = 'info', duration = 4000 }) {
         const container = document.getElementById('toastContainer');
         if (!container) return;
+        if (type === 'warning') {
+          const children = Array.from(container.children);
+          for (const c of children) {
+            if (c.getAttribute('data-type') === 'warning') {
+              c.remove();
+            }
+          }
+        }
         const iconMap = { success: 'check_circle', error: 'cancel', warning: 'warning', info: 'info' };
         const colorClass = type === 'success' ? { bar: 'bg-success', icon: 'text-success' } :
           type === 'error' ? { bar: 'bg-error', icon: 'text-error' } :
@@ -606,6 +994,7 @@
         el.className = 'toast bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-lg p-4 ant-shadow flex items-start gap-3 relative overflow-hidden pointer-events-auto toast-enter';
         el.setAttribute('role', 'alert');
         el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        el.setAttribute('data-type', type);
         el.innerHTML = `
           <div class="absolute top-0 left-0 w-1 h-full ${colorClass.bar}"></div>
           <span class="material-symbols-outlined ${colorClass.icon}">${iconMap[type]}</span>
@@ -652,11 +1041,11 @@
         if (!downloadBtn) return;
         if (enabled && resultBlobUrl) {
           downloadBtn.classList.remove('cursor-not-allowed','pointer-events-none','text-slate-400','dark:text-slate-500','bg-slate-100','dark:bg-slate-800','border-slate-200','dark:border-slate-700');
-          downloadBtn.classList.add('bg-primary','hover:bg-primary/90','text-white','border','border-primary');
+          downloadBtn.classList.add('bg-primary','hover:bg-primary/90','text-on-primary','border','border-primary');
           downloadBtn.removeAttribute('disabled');
         } else {
           downloadBtn.classList.add('cursor-not-allowed','pointer-events-none','text-slate-400','dark:text-slate-500','bg-slate-100','dark:bg-slate-800','border','border-slate-200','dark:border-slate-700');
-          downloadBtn.classList.remove('bg-primary','hover:bg-primary/90','text-white','border-primary');
+          downloadBtn.classList.remove('bg-primary','hover:bg-primary/90','text-on-primary','border-primary');
           downloadBtn.setAttribute('disabled','');
         }
       }
