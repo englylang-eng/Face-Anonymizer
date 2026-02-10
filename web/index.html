@@ -307,7 +307,7 @@
             <div class="flex items-center justify-between px-2">
               <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">upload_file</span>
-                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Input Image</h3>
+                <h3 id="inputHeading" class="text-lg font-bold text-slate-900 dark:text-slate-100">Input Images</h3>
               </div>
               <span class="text-xs font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-full uppercase tracking-wider">Source</span>
             </div>
@@ -322,7 +322,7 @@
                     <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
                   </div>
                   <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
-                    Browse Files
+                    Browse Images
                   </button>
                   <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
                 </div>
@@ -446,6 +446,7 @@
       const logView = document.getElementById('errorLog');
       const copyLogsBtn = document.getElementById('copyLogsBtn');
       const clearLogsBtn = document.getElementById('clearLogsBtn');
+      const inputHeading = document.getElementById('inputHeading');
       
 
       let selectedFile = null;
@@ -483,6 +484,7 @@
       const ALLOWED_IMAGE_EXT = ['.jpg','.jpeg','.png','.webp'];
       const ALLOWED_VIDEO_TYPES = ['video/mp4','video/webm'];
       const ALLOWED_VIDEO_EXT = ['.mp4','.webm'];
+      
       function extOf(name) { const i = name.lastIndexOf('.'); return i >= 0 ? name.slice(i).toLowerCase() : ''; }
       function canPlayVideoType(t) { const v = document.createElement('video'); return !!(v.canPlayType && v.canPlayType(t)); }
       function readHead(file, n = 32) {
@@ -528,6 +530,19 @@
           if (!canPlayVideoType(file.type)) return { ok: false, msg: 'Browser cannot play this video type' };
           const ok = await sniffVideo(file);
           if (!ok) return { ok: false, msg: 'Invalid or corrupted video' };
+          try {
+            const fd = new FormData();
+            fd.append('video', file);
+            const resp = await fetch(`${API_BASE}/api/validate_video`, { method: 'POST', body: fd });
+            if (!resp.ok) {
+              return { ok: false, msg: 'Video validation failed' };
+            }
+            const j = await resp.json();
+            if (!j || j.faces === undefined) return { ok: false, msg: 'Video validation failed' };
+            if (Number(j.faces || 0) <= 0) return { ok: false, msg: 'No faces detected in the first seconds' };
+          } catch {
+            return { ok: false, msg: 'Unable to validate video' };
+          }
           return { ok: true };
         }
       }
@@ -577,7 +592,7 @@
         if (source === 'image') {
           if (btn) btn.addEventListener('click', () => input && input.click());
           if (input) input.addEventListener('change', (e) => handleFiles(e.target.files));
-        } else {
+        } else if (source === 'video') {
           if (vbtn) vbtn.addEventListener('click', () => vinput && vinput.click());
           if (vinput) vinput.addEventListener('change', (e) => handleFiles(e.target.files));
         }
@@ -605,11 +620,12 @@
       if (copyLogsBtn) copyLogsBtn.addEventListener('click', async () => {});
       if (clearLogsBtn) clearLogsBtn.addEventListener('click', () => {}); */
 
-      ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, (e) => e.preventDefault());
-        dropArea.addEventListener(eventName, (e) => e.stopPropagation());
+      ;['dragenter', 'dragover', 'dragleave'].forEach(eventName => {
+        if (dropArea) {
+          dropArea.addEventListener(eventName, (e) => e.preventDefault());
+          dropArea.addEventListener(eventName, (e) => e.stopPropagation());
+        }
       });
-      dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
       function positionTabIndicator(btn) {
         if (!tabIndicator || !btn || !sourceTabs) return;
         const left = Math.round(btn.offsetLeft);
@@ -634,22 +650,27 @@
         if (reprocTimer) { clearTimeout(reprocTimer); reprocTimer = null; }
         if (currentAbortController) { try { currentAbortController.abort(); } catch {} currentAbortController = null; }
         busy = false;
+        
         // clear selected data and revoke blobs
         selectedFile = null;
         if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); resultBlobUrl = null; }
         // switch source and rebuild UI
         source = next;
         const imgActive = next === 'image';
+        const vidActive = next === 'video';
         dropArea.innerHTML = imgActive ? renderDropAreaContent() : renderVideoPlaceholderContent();
         bindUploadControls();
         tabImage.className = imgActive
           ? 'px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors'
           : 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors';
-        tabVideo.className = imgActive
-          ? 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors'
-          : 'px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors';
+        tabVideo.className = vidActive
+          ? 'px-6 py-2 rounded-full font-bold text-sm text-on-primary relative z-10 transition-colors'
+          : 'px-6 py-2 rounded-full font-bold text-sm text-slate-700 dark:text-slate-300 relative z-10 transition-colors';
         positionTabIndicator(imgActive ? tabImage : tabVideo);
         statusText.textContent = 'No file selected';
+        if (inputHeading) {
+          inputHeading.textContent = imgActive ? 'Input Images' : 'Input Video';
+        }
         // reset result box placeholder to match new source
         if (imgActive) {
           resultBox.innerHTML = `<span class="material-symbols-outlined text-slate-300 text-5xl">visibility_off</span><p class="text-sm font-medium px-12 text-slate-400">Processed image will appear here after clicking 'Anonymize'</p>`;
@@ -957,6 +978,7 @@
           setAnonymizeEnabled(true, false);
         }
       }
+      
       function scheduleAnonymize() {
         if (!selectedFile) return;
         if (reprocTimer) clearTimeout(reprocTimer);
@@ -986,7 +1008,6 @@
       
 
       function toast(msg, type = 'info', duration = 2000) {
-        statusText.textContent = msg;
         showToast({ title: type === 'error' ? 'Error' : type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : 'Info', message: msg, type, duration });
       }
 
@@ -1029,7 +1050,7 @@
             <p class="text-sm text-slate-500 mt-1">Supports JPG, PNG or WEBP (Max 10MB)</p>
           </div>
           <button id="browseBtn" class="mt-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md">
-            Browse Files
+            Browse Images
           </button>
           <input id="fileInput" type="file" accept="image/*" class="hidden" />
         `;
@@ -1049,6 +1070,7 @@
           <input id="videoInput" type="file" accept="video/mp4,video/webm" class="hidden" />
         `;
       }
+      
       function showToast({ title, message, type = 'info', duration = 4000 }) {
         const container = document.getElementById('toastContainer');
         if (!container) return;

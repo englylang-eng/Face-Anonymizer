@@ -16,10 +16,22 @@ def load_cascade():
         sys.exit(1)
     return face_cascade
 
+def _normalize_method(method: str) -> str:
+    m = (method or "blur").lower().strip()
+    if m in ("remap_features","feature","features","landmarks","facial_features"):
+        return "pixelate"
+    if m in ("pixelate","pixelation","mosaic","tiles"):
+        return "pixelate"
+    if m in ("bar","blackbar","black_bar","censor","censored_bar"):
+        return "black_bar"
+    if m in ("gaussian","gaussian_blur","blur"):
+        return "blur"
+    return m
+
  
 
 def _apply_anonymization(img, rects: List[Tuple[int,int,int,int]], method: str = "blur", intensity: int = 30):
-    method = (method or "blur").lower()
+    method = _normalize_method(method)
     intensity = max(5, min(100, int(intensity)))
     blur_divisor = 10 - (intensity / 100.0) * 8
     pixel_scale = 2 + int((intensity / 100.0) * 18)
@@ -64,11 +76,13 @@ def _apply_anonymization(img, rects: List[Tuple[int,int,int,int]], method: str =
             img[y:y+h, x:x+w] = blurred
     return img
 
+# Landmark-based code removed
 def process_array(img, method: str = "blur", intensity: int = 30):
     face_cascade = load_cascade()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
     rects = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
+    method = _normalize_method(method)
     img = _apply_anonymization(img, rects, method=method, intensity=intensity)
     return img, len(rects)
 
@@ -124,10 +138,13 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
         writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     face_cascade = load_cascade()
     total_faces = 0
+    method = _normalize_method(method)
     target_detect_width = 480 if fast else 640
     detect_every = 3 if fast else 2
     frame_index = 0
     last_rects: List[Tuple[int,int,int,int]] = []
+    prev_gray = None
+    points_list: List[np.ndarray] = []
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -182,12 +199,78 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
                     rh = int(round(h * inv))
                     rects.append((rx, ry, rw, rh))
             last_rects = rects
+            points_list = []
+            if len(last_rects) > 0:
+                for (x, y, w, h) in last_rects:
+                    x0 = max(0, x)
+                    y0 = max(0, y)
+                    x1 = min(width, x + w)
+                    y1 = min(height, y + h)
+                    sub = gray[y0:y1, x0:x1]
+                    pts = cv2.goodFeaturesToTrack(sub, maxCorners=25 if not fast else 15, qualityLevel=0.01, minDistance=5)
+                    if pts is not None and len(pts) > 0:
+                        pts = pts.reshape(-1, 2)
+                        pts[:, 0] += x0
+                        pts[:, 1] += y0
+                        points_list.append(pts.astype(np.float32))
+                    else:
+                        points_list.append(np.empty((0, 2), dtype=np.float32))
         else:
             rects = last_rects
+            if prev_gray is not None and len(points_list) == len(last_rects) and len(last_rects) > 0:
+                updated_rects: List[Tuple[int,int,int,int]] = []
+                new_points_list: List[np.ndarray] = []
+                for i, (x, y, w, h) in enumerate(last_rects):
+                    pts_prev = points_list[i]
+                    if pts_prev is None or len(pts_prev) == 0:
+                        updated_rects.append((x, y, w, h))
+                        new_points_list.append(pts_prev)
+                        continue
+                    pts_prev_klt = pts_prev.reshape(-1, 1, 2)
+                    pts_next, st, err = cv2.calcOpticalFlowPyrLK(prev_gray, gray, pts_prev_klt, None, winSize=(21, 21), maxLevel=3, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+                    if pts_next is None or st is None:
+                        updated_rects.append((x, y, w, h))
+                        new_points_list.append(pts_prev)
+                        continue
+                    st = st.reshape(-1)
+                    valid_prev = pts_prev[st == 1]
+                    valid_next = pts_next.reshape(-1, 2)[st == 1]
+                    if len(valid_prev) >= 4 and len(valid_next) >= 4:
+                        dxy = valid_next - valid_prev
+                        dx = np.median(dxy[:, 0])
+                        dy = np.median(dxy[:, 1])
+                        nx = int(round(x + dx))
+                        ny = int(round(y + dy))
+                        nx = max(0, min(nx, width - 1))
+                        ny = max(0, min(ny, height - 1))
+                        updated_rects.append((nx, ny, w, h))
+                        new_points_list.append(valid_next.astype(np.float32))
+                    else:
+                        updated_rects.append((x, y, w, h))
+                        new_points_list.append(valid_next.astype(np.float32) if valid_next is not None else np.empty((0, 2), dtype=np.float32))
+                rects = updated_rects
+                last_rects = rects
+                points_list = []
+                for i, (x, y, w, h) in enumerate(rects):
+                    pts = new_points_list[i] if i < len(new_points_list) else np.empty((0, 2), dtype=np.float32)
+                    if pts is None or len(pts) < 6:
+                        x0 = max(0, x)
+                        y0 = max(0, y)
+                        x1 = min(width, x + w)
+                        y1 = min(height, y + h)
+                        sub = gray[y0:y1, x0:x1]
+                        rep = cv2.goodFeaturesToTrack(sub, maxCorners=25 if not fast else 15, qualityLevel=0.01, minDistance=5)
+                        if rep is not None and len(rep) > 0:
+                            rep = rep.reshape(-1, 2)
+                            rep[:, 0] += x0
+                            rep[:, 1] += y0
+                            pts = rep.astype(np.float32)
+                    points_list.append(pts if pts is not None else np.empty((0, 2), dtype=np.float32))
         total_faces += len(rects)
         frame = _apply_anonymization(frame, rects, method=method, intensity=intensity)
         writer.write(frame)
         frame_index += 1
+        prev_gray = gray
     cap.release()
     writer.release()
     final = output_path
@@ -208,3 +291,37 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
         print("Error: Failed to produce output video.")
         return "", total_faces
     return final, total_faces
+
+def probe_video_faces(input_path: str, max_frames: int = 90, fast: bool = True) -> int:
+    if not os.path.exists(input_path):
+        return 0
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        return 0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    face_cascade = load_cascade()
+    target_detect_width = 480 if fast else 640
+    scale = 1.0
+    if width > target_detect_width:
+        scale = float(target_detect_width) / float(width)
+    total = 0
+    frames = 0
+    while frames < max_frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        detect_gray = gray if scale >= 1.0 else cv2.resize(gray, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+        faces = face_cascade.detectMultiScale(
+            detect_gray,
+            scaleFactor=1.1 if not fast else 1.2,
+            minNeighbors=5 if not fast else 4,
+            minSize=(int(30 * scale), int(30 * scale)),
+        )
+        total += len(faces)
+        frames += 1
+        if total > 0:
+            break
+    cap.release()
+    return total

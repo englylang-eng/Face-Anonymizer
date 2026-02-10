@@ -5,6 +5,7 @@ import cv2
 from flask import Flask, request, send_file, send_from_directory, jsonify
 from tempfile import NamedTemporaryFile
 from anonymizer import process_array, process_video
+from anonymizer import probe_video_faces
 import mimetypes
 import shutil
 from flask_cors import CORS
@@ -142,6 +143,29 @@ def anonymize_video():
         if total_faces == 0:
             return jsonify({"error": "no faces found"}), 400
         return send_file(output_path, mimetype="video/mp4", download_name="anonymized.mp4")
+    finally:
+        try:
+            os.remove(tmp_in_path)
+        except:
+            pass
+@app.post("/api/validate_video")
+def validate_video():
+    if "video" not in request.files:
+        return jsonify({"ok": False, "error": "no video"}), 400
+    file = request.files["video"]
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if file.mimetype not in ("video/mp4","video/webm"):
+        return jsonify({"ok": False, "error": "unsupported video type"}), 400
+    if ext not in (".mp4",".webm"):
+        return jsonify({"ok": False, "error": "unsupported video extension"}), 400
+    if not file:
+        return jsonify({"ok": False, "error": "empty file"}), 400
+    with NamedTemporaryFile(delete=False, suffix=ext or ".mp4") as tmp_in:
+        file.save(tmp_in)
+        tmp_in_path = tmp_in.name
+    try:
+        faces = probe_video_faces(tmp_in_path, max_frames=120, fast=True)
+        return jsonify({"ok": True, "faces": int(faces)})
     finally:
         try:
             os.remove(tmp_in_path)
