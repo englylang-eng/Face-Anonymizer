@@ -16,6 +16,12 @@ def load_cascade():
         sys.exit(1)
     return face_cascade
 
+def count_faces_array(img) -> int:
+    face_cascade = load_cascade()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    return int(len(faces))
+
 def _normalize_method(method: str) -> str:
     m = (method or "blur").lower().strip()
     if m in ("remap_features","feature","features","landmarks","facial_features"):
@@ -91,6 +97,27 @@ def process_array(img, method: str = "blur", intensity: int = 30):
 def _ffmpeg_path() -> str:
     return shutil.which("ffmpeg") or ""
 
+def _transcode_to_h264(src: str, dst: str) -> bool:
+    ffmpeg = _ffmpeg_path()
+    if not ffmpeg:
+        return False
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i", src,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-an",
+        dst,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, check=False)
+    except Exception:
+        return False
+    return proc.returncode == 0 and os.path.exists(dst) and os.path.getsize(dst) > 0
+
 def _mux_audio_with_ffmpeg(video_no_audio: str, source_with_audio: str, final_out: str) -> bool:
     ffmpeg = _ffmpeg_path()
     if not ffmpeg:
@@ -117,13 +144,20 @@ def _mux_audio_with_ffmpeg(video_no_audio: str, source_with_audio: str, final_ou
         return False
     return proc.returncode == 0 and os.path.exists(final_out) and os.path.getsize(final_out) > 0
 
-def process_video(input_path: str, output_path: str, method: str = "blur", intensity: int = 30, fast: bool = False) -> Tuple[str, int]:
+def process_video(input_path: str, output_path: str, method: str = "blur", intensity: int = 30, fast: bool = False, progress_cb=None) -> Tuple[str, int]:
     if not os.path.exists(input_path):
         print(f"Error: Video file not found at {input_path}")
         return "", 0
-    cap = cv2.VideoCapture(input_path)
+    read_path = input_path
+    cap = cv2.VideoCapture(read_path)
     if not cap.isOpened():
-        print("Error: Could not open video.")
+        out_dir = os.path.dirname(output_path) or "."
+        os.makedirs(out_dir, exist_ok=True)
+        trans_path = os.path.join(out_dir, "_transcoded_h264.mp4")
+        if _transcode_to_h264(input_path, trans_path):
+            read_path = trans_path
+            cap = cv2.VideoCapture(read_path)
+    if not cap.isOpened():
         return "", 0
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -145,6 +179,7 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
     last_rects: List[Tuple[int,int,int,int]] = []
     prev_gray = None
     points_list: List[np.ndarray] = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -270,6 +305,12 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
         frame = _apply_anonymization(frame, rects, method=method, intensity=intensity)
         writer.write(frame)
         frame_index += 1
+        if progress_cb and total_frames > 0:
+            try:
+                pct = int(min(99, max(0, (frame_index * 100) // total_frames)))
+                progress_cb(pct)
+            except Exception:
+                pass
         prev_gray = gray
     cap.release()
     writer.release()
@@ -287,15 +328,32 @@ def process_video(input_path: str, output_path: str, method: str = "blur", inten
                 produced = False
     else:
         produced = os.path.exists(output_path) and os.path.getsize(output_path) > 0
+    if read_path != input_path:
+        try:
+            os.remove(read_path)
+        except Exception:
+            pass
     if not produced:
         print("Error: Failed to produce output video.")
         return "", total_faces
+    if progress_cb:
+        try:
+            progress_cb(100)
+        except Exception:
+            pass
     return final, total_faces
 
 def probe_video_faces(input_path: str, max_frames: int = 90, fast: bool = True) -> int:
     if not os.path.exists(input_path):
         return 0
-    cap = cv2.VideoCapture(input_path)
+    read_path = input_path
+    cap = cv2.VideoCapture(read_path)
+    if not cap.isOpened():
+        out_dir = os.path.dirname(input_path) or "."
+        trans_path = os.path.join(out_dir, "_probe_transcoded_h264.mp4")
+        if _transcode_to_h264(input_path, trans_path):
+            read_path = trans_path
+            cap = cv2.VideoCapture(read_path)
     if not cap.isOpened():
         return 0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -324,4 +382,9 @@ def probe_video_faces(input_path: str, max_frames: int = 90, fast: bool = True) 
         if total > 0:
             break
     cap.release()
+    if read_path != input_path:
+        try:
+            os.remove(read_path)
+        except Exception:
+            pass
     return total
