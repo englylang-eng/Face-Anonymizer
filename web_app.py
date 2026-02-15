@@ -46,9 +46,21 @@ def images_list():
 @app.after_request
 def add_no_cache(resp):
     try:
-        resp.headers.setdefault("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        resp.headers.setdefault("Pragma", "no-cache")
-        resp.headers.setdefault("Expires", "0")
+        p = request.path or ""
+        if p.startswith("/web/assets/") or p.startswith("/web/logo") or p == "/logo.png" or p.startswith("/images/"):
+            resp.headers["Cache-Control"] = "public, max-age=86400, immutable"
+            try:
+                del resp.headers["Pragma"]
+            except Exception:
+                pass
+            try:
+                del resp.headers["Expires"]
+            except Exception:
+                pass
+        else:
+            resp.headers.setdefault("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            resp.headers.setdefault("Pragma", "no-cache")
+            resp.headers.setdefault("Expires", "0")
         csp = "; ".join([
             "default-src 'self'",
             "script-src 'self' https://cdn.tailwindcss.com 'unsafe-inline'",
@@ -66,6 +78,9 @@ def add_no_cache(resp):
     except Exception:
         pass
     return resp
+@app.get("/api/ping")
+def api_ping():
+    return jsonify({"ok": True})
 @app.get("/logo.png")
 def serve_logo():
     path = os.path.join(os.path.dirname(__file__), "images", "logo.png")
@@ -114,6 +129,91 @@ def refresh_logo():
         return jsonify({"ok": True, "size": size})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+FAVICON_CACHE = {}
+FAVICON_CACHE_MAX = 12
+
+@app.get("/favicon.png")
+def favicon_png():
+    try:
+        size = int(request.args.get("size", "32"))
+    except Exception:
+        size = 32
+    size = max(16, min(size, 512))
+    base = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base, "images", "logo.png"),
+        os.path.join(base, "web", "logo.png"),
+    ]
+    src_path = None
+    for p in candidates:
+        if os.path.exists(p):
+            src_path = p
+            break
+    if not src_path:
+        return jsonify({"error": "logo missing"}), 404
+    try:
+        mtime = os.path.getmtime(src_path)
+        cache_key = (int(mtime), int(size))
+        cached = FAVICON_CACHE.get(cache_key)
+        if cached is not None:
+            bio = BytesIO(cached)
+            bio.seek(0)
+            return send_file(bio, mimetype="image/png")
+        data = np.fromfile(src_path, dtype=np.uint8)
+        img = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            return jsonify({"error": "cannot load logo"}), 500
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+        elif img.shape[2] == 3:
+            b, g, r = cv2.split(img)
+            alpha = np.where((b + g + r) > 10, 255, 0).astype(np.uint8)
+            img = cv2.merge([b, g, r, alpha])
+        # Crop to the non-transparent bounds to avoid excessive padding
+        alpha = img[:, :, 3]
+        ys, xs = np.where(alpha > 0)
+        if ys.size > 0 and xs.size > 0:
+            y0, y1 = int(ys.min()), int(ys.max()) + 1
+            x0, x1 = int(xs.min()), int(xs.max()) + 1
+            img = img[y0:y1, x0:x1, :]
+        # Build white silhouette using cropped alpha
+        h, w = img.shape[:2]
+        silhouette = np.zeros((h, w, 4), dtype=np.uint8)
+        silhouette[:, :, 0:3] = 255  # white RGB
+        silhouette[:, :, 3] = img[:, :, 3]  # preserve alpha edges
+        # Compose onto a square canvas with soft margins, centered
+        canvas = np.zeros((size, size, 4), dtype=np.uint8)
+        pad = max(0, int(round(size * 0.12)))
+        max_dim = max(h, w)
+        denom = max(1, max_dim)
+        scale = max(0.0, (size - 2 * pad) / float(denom))
+        new_w = max(1, int(round(w * scale)))
+        new_h = max(1, int(round(h * scale)))
+        interp = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+        resized = cv2.resize(silhouette, (new_w, new_h), interpolation=interp)
+        x_off = (size - new_w) // 2
+        y_off = (size - new_h) // 2
+        # Alpha-composite resized onto canvas
+        sub = canvas[y_off:y_off+new_h, x_off:x_off+new_w, :]
+        alpha_r = resized[:, :, 3:4].astype(np.float32) / 255.0
+        inv_alpha = 1.0 - alpha_r
+        sub[:, :, 0:3] = (alpha_r * resized[:, :, 0:3] + inv_alpha * sub[:, :, 0:3]).astype(np.uint8)
+        sub[:, :, 3] = np.clip((alpha_r[:, :, 0] * 255) + sub[:, :, 3].astype(np.float32), 0, 255).astype(np.uint8)
+        ok, buf = cv2.imencode(".png", canvas)
+        if not ok:
+            return jsonify({"error": "encode error"}), 500
+        raw = buf.tobytes()
+        FAVICON_CACHE[cache_key] = raw
+        if len(FAVICON_CACHE) > FAVICON_CACHE_MAX:
+            first_key = next(iter(FAVICON_CACHE.keys()))
+            if first_key != cache_key:
+                FAVICON_CACHE.pop(first_key, None)
+        bio = BytesIO(raw)
+        bio.seek(0)
+        return send_file(bio, mimetype="image/png")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.post("/api/anonymize")
 def anonymize():
     if "image" not in request.files:
@@ -287,7 +387,7 @@ def validate_video():
         file.save(tmp_in)
         tmp_in_path = tmp_in.name
     try:
-        faces = probe_video_faces(tmp_in_path, max_frames=120, fast=True)
+        faces = probe_video_faces(tmp_in_path, max_frames=120, fast=False)
         return jsonify({"ok": True, "faces": int(faces)})
     finally:
         try:

@@ -65,10 +65,9 @@ def make_test_video(tmpdir: Path) -> Path:
 def check_ui_elements(html: str):
     ids = [
         "tabImage","tabVideo","tabImageMobile","tabVideoMobile",
-        "browseBtn","fileInput","downloadBtn",
+        "dropArea","statusText","fileInput","downloadBtn",
         "typeSelectBtn","typeMenu","intensityRange","fastModeToggle",
         "anonymizeBtn","clearBtn","resultBox","toastContainer",
-        "progressBarInner","progressPercent",
     ]
     missing = [i for i in ids if (f'id="{i}"' not in html)]
     return missing

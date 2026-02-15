@@ -25,3 +25,6 @@ Thumbs.db
 # Flask instance/data
 instance/
 *.db
+
+# Frontend dependencies
+node_modules/

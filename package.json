@@ -1,0 +1,24 @@
+{
+  "name": "lang_engly",
+  "version": "1.0.0",
+  "description": "Privacy-first image and video anonymization using OpenCV and a simple Flask web UI.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/englylang-eng/Face-Anonymizer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/englylang-eng/Face-Anonymizer/issues"
+  },
+  "homepage": "https://github.com/englylang-eng/Face-Anonymizer#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.10"
+  }
+}
