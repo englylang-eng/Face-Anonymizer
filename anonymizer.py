@@ -3,15 +3,18 @@ Face anonymizer utilities.
 
 Backward-compatible: public functions and signatures are preserved:
 - load_cascades, load_eye_cascades, process_array, process_video, probe_video_faces, count_faces_array
-"""
 
+Improvements:
+ - Optional DNN face detector fallback if model files are present under ./models/
+ - Feathered elliptical blending for anonymized ROIs to avoid hard edges
+ - Cached CLAHE and cascade/dnn loads, and fewer expensive image rotations
+"""
 from __future__ import annotations
 
-import argparse
 import logging
 import shutil
 import subprocess
-import sys
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Tuple, Optional
@@ -24,11 +27,41 @@ cv2.setUseOptimized(True)
 # Configure a module-level logger. Consumers can reconfigure as needed.
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    # default handler when module executed standalone
     h = logging.StreamHandler()
     h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     logger.addHandler(h)
 logger.setLevel(logging.INFO)
+
+# Optional DNN model filenames (support both prototxt and prototxt.txt)
+_DNN_PROTO_CANDIDATES = [
+    Path(__file__).parent / "models" / "deploy.prototxt",
+    Path(__file__).parent / "models" / "deploy.prototxt.txt",
+]
+_DNN_WEIGHTS = Path(__file__).parent / "models" / "res10_300x300_ssd_iter_140000.caffemodel"
+
+# Prefer DNN before cascades when True; default is False to preserve existing behavior.
+_DNN_FIRST: bool = False
+
+# Optional setter if other code wants to toggle it programmatically.
+def set_dnn_first(v: bool) -> None:
+    global _DNN_FIRST
+    _DNN_FIRST = bool(v)
+
+# Rate-limited DNN-per-frame logging (seconds between logs)
+_last_dnn_log_time: float = 0.0
+_dnn_log_interval: float = 5.0  # default seconds between log events to avoid spam
+
+def set_dnn_log_interval(seconds: float) -> None:
+    """Set the minimum interval (seconds) between per-frame DNN debug log events."""
+    global _dnn_log_interval
+    try:
+        s = float(seconds)
+        if s < 0.0:
+            s = 0.0
+        _dnn_log_interval = s
+    except Exception:
+        # ignore invalid values
+        pass
 
 
 def _path(p: str) -> str:
@@ -84,6 +117,64 @@ def load_eye_cascades() -> List[cv2.CascadeClassifier]:
     return out
 
 
+@lru_cache(maxsize=1)
+def _get_clahe():
+    """Return cached CLAHE object to avoid repeated construction."""
+    return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
+
+@lru_cache(maxsize=1)
+def _load_dnn_net() -> Optional[cv2.dnn_Net]:
+    """Load DNN face detector if model files present. Returns None if not available.
+
+    This supports both deploy.prototxt and deploy.prototxt.txt filenames.
+    """
+    try:
+        proto = None
+        for p in _DNN_PROTO_CANDIDATES:
+            if p.exists():
+                proto = p
+                break
+        if proto is not None and _DNN_WEIGHTS.exists():
+            net = cv2.dnn.readNetFromCaffe(str(proto), str(_DNN_WEIGHTS))
+            try:
+                net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+                net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+            except Exception:
+                pass
+            logger.info("Loaded DNN detector from %s and %s", proto, _DNN_WEIGHTS)
+            return net
+    except Exception as ex:
+        logger.debug("Failed to load DNN net: %s", ex)
+    return None
+
+
+def _detect_with_dnn(bgr: np.ndarray, net: cv2.dnn_Net, conf_thresh: float = 0.5) -> List[Tuple[int, int, int, int]]:
+    """Use OpenCV DNN res10 SSD to detect faces. Returns list of (x,y,w,h) in image coords."""
+    if net is None:
+        return []
+    h, w = bgr.shape[:2]
+    in_blob = cv2.dnn.blobFromImage(bgr, 1.0, (300, 300), (104.0, 177.0, 123.0), swapRB=False, crop=False)
+    net.setInput(in_blob)
+    out = net.forward()
+    rects: List[Tuple[int, int, int, int]] = []
+    for i in range(out.shape[2]):
+        conf = float(out[0, 0, i, 2])
+        if conf < conf_thresh:
+            continue
+        x1 = int(out[0, 0, i, 3] * w)
+        y1 = int(out[0, 0, i, 4] * h)
+        x2 = int(out[0, 0, i, 5] * w)
+        y2 = int(out[0, 0, i, 6] * h)
+        x1 = max(0, min(w - 1, x1))
+        y1 = max(0, min(h - 1, y1))
+        x2 = max(0, min(w, x2))
+        y2 = max(0, min(h, y2))
+        if x2 > x1 and y2 > y1:
+            rects.append((x1, y1, x2 - x1, y2 - y1))
+    return rects
+
+
 def _nms(rects: List[Tuple[int, int, int, int]], thr: float = 0.3) -> List[Tuple[int, int, int, int]]:
     """Non-maximum suppression on (x,y,w,h) rectangles."""
     if not rects:
@@ -126,9 +217,9 @@ def _detect_with_cascades(
 
 
 def _prepare_gray(img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Return (gray, equalized_gray) used by detectors."""
+    """Return (gray, equalized_gray) used by detectors (CLAHE cached)."""
     g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe = _get_clahe()
     ge = clahe.apply(g)
     return g, ge
 
@@ -181,14 +272,16 @@ def _filter_human_faces(gray: np.ndarray, rects: List[Tuple[int, int, int, int]]
                 ok = True if fast else False
             if ok:
                 out.append((x, y, w, h))
-        else:
-            # reject false positives
-            pass
     return out
 
 
 def _detect_faces_image(img: np.ndarray, strict: bool = False) -> List[Tuple[int, int, int, int]]:
-    """Detect faces in a single image using multiple variants (CLAHE, unsharp)."""
+    """Detect faces in a single image using cascades + optional DNN.
+
+    Behavior:
+      - Default (preserve old): cascades used first; DNN tried only if cascades find nothing.
+      - If module-level _DNN_FIRST is True and DNN is available: DNN is tried first, then cascades if DNN finds nothing.
+    """
     g, ge = _prepare_gray(img)
     h, w = g.shape[:2]
     minp = max(12, int(min(h, w) * 0.028))
@@ -198,26 +291,57 @@ def _detect_faces_image(img: np.ndarray, strict: bool = False) -> List[Tuple[int
     us = cv2.addWeighted(g, 1.5, blur, -0.5, 0)
     variants.append(us)
     rects: List[Tuple[int, int, int, int]] = []
+    net = _load_dnn_net()
+
+    # If user requested DNN-first and net present -> try it first on color image.
+    if _DNN_FIRST and net is not None:
+        try:
+            dnn_rects = _detect_with_dnn(img, net, conf_thresh=0.5)
+            if dnn_rects:
+                rects = _nms(dnn_rects, 0.25)
+                rects = _filter_human_faces(g, rects, fast=not strict)
+                return rects
+        except Exception:
+            logger.debug("DNN-first detection failed; falling back to cascades", exc_info=True)
+
+    # Cascade-based detection (cached cascades)
     for v in variants:
         r1 = _detect_with_cascades(v, casc, sf=1.1, mn=4, min_size_px=minp)
         r2 = _detect_with_cascades(v, casc, sf=1.06, mn=3, min_size_px=minp)
-        rects.extend(r1)
-        rects.extend(r2)
-        hh, ww = v.shape[:2]
-        cy, cx = hh // 2, ww // 2
-        for ang in (-12, -8, 8, 12):
-            M = cv2.getRotationMatrix2D((cx, cy), ang, 1.0)
-            vr = cv2.warpAffine(v, M, (ww, hh), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-            rr1 = _detect_with_cascades(vr, cascades=casc, sf=1.1, mn=4, min_size_px=minp)
-            rr2 = _detect_with_cascades(vr, cascades=casc, sf=1.06, mn=3, min_size_px=minp)
-            rects.extend(rr1)
-            rects.extend(rr2)
-        vf = cv2.flip(v, 1)
-        rf1 = _detect_with_cascades(vf, casc, sf=1.1, mn=4, min_size_px=minp)
-        rf2 = _detect_with_cascades(vf, casc, sf=1.06, mn=3, min_size_px=minp)
-        rects.extend(rf1)
-        rects.extend(rf2)
+        found = r1 + r2
+        rects.extend(found)
+
+        # only attempt rotations if this variant produced no results
+        if not found:
+            hh, ww = v.shape[:2]
+            cy, cx = hh // 2, ww // 2
+            for ang in (-12, -8, 8, 12):
+                M = cv2.getRotationMatrix2D((cx, cy), ang, 1.0)
+                vr = cv2.warpAffine(v, M, (ww, hh), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                rr1 = _detect_with_cascades(vr, cascades=casc, sf=1.1, mn=4, min_size_px=minp)
+                rr2 = _detect_with_cascades(vr, cascades=casc, sf=1.06, mn=3, min_size_px=minp)
+                rects.extend(rr1)
+                rects.extend(rr2)
+
+        # try flipped variant only if nothing found yet to save cycles
+        if not rects:
+            vf = cv2.flip(v, 1)
+            rf1 = _detect_with_cascades(vf, casc, sf=1.1, mn=4, min_size_px=minp)
+            rf2 = _detect_with_cascades(vf, casc, sf=1.06, mn=3, min_size_px=minp)
+            rects.extend(rf1)
+            rects.extend(rf2)
+
     rects = _nms(rects, 0.25)
+
+    # If cascades found nothing and DNN is available, try DNN as a fallback
+    if len(rects) == 0 and net is not None:
+        try:
+            dnn_rects = _detect_with_dnn(img, net, conf_thresh=0.5)
+            if dnn_rects:
+                rects = _nms(dnn_rects, 0.25)
+        except Exception:
+            logger.debug("DNN detection failed", exc_info=True)
+
     rects = _filter_human_faces(g, rects, fast=not strict)
     return rects
 
@@ -243,9 +367,10 @@ def _normalize_method(method: Optional[str]) -> str:
 def _apply_anonymization(img: np.ndarray, rects: List[Tuple[int, int, int, int]], method: str = "blur", intensity: int = 30) -> np.ndarray:
     """
     Apply anonymization inplace to `img` for list of rectangles.
-    - pixelate: fast resized pixelation
-    - black_bar: fill with black
-    - blur: Gaussian blur with kernel depending on intensity
+    Improvements:
+      - blends anonymized ROI back using a feathered elliptical alpha mask to avoid hard rectangular edges
+      - safe, clamped Gaussian kernel sizes
+      - stable resize-based pixelation
     """
     method = _normalize_method(method)
     intensity = max(5, min(100, int(intensity)))
@@ -253,6 +378,33 @@ def _apply_anonymization(img: np.ndarray, rects: List[Tuple[int, int, int, int]]
     blur_divisor = max(1.0, 10.0 - (intensity / 100.0) * 8.0)
     # pixel_scale used for resize-based pixelation
     pixel_scale = max(1, 2 + int((intensity / 100.0) * 18))
+
+    def _elliptical_alpha(h: int, w: int, inset_pct: float = 0.08, feather_frac: float = 0.25) -> np.ndarray:
+        """
+        Create an alpha mask (float32 [0..1]) of shape (h,w,1) where center ellipse ~1 and edges feather to 0.
+        inset_pct: how much to shrink ellipse relative to ROI (0..0.5)
+        feather_frac: fraction of max(h,w) used as Gaussian kernel for feathering
+
+        Safety: for very small ROIs return full alpha (no feather) to avoid edge leakage.
+        """
+        min_dim = min(h, w)
+        if min_dim < 32:
+            return np.ones((h, w, 1), dtype=np.float32)
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cx, cy = w // 2, h // 2
+        ax = int(round((w * (1.0 - inset_pct)) / 2.0))
+        ay = int(round((h * (1.0 - inset_pct)) / 2.0))
+        if ax <= 0 or ay <= 0:
+            return np.ones((h, w, 1), dtype=np.float32)  # fallback -> fully anonymize
+        cv2.ellipse(mask, (cx, cy), (ax, ay), 0, 0, 360, 255, -1)
+        # feather by blurring the mask; kernel size should be odd and > 1
+        k = max(3, int(round(max(h, w) * feather_frac)))
+        if k % 2 == 0:
+            k += 1
+        blurred = cv2.GaussianBlur(mask, (k, k), 0)
+        alpha = (blurred.astype(np.float32) / 255.0)[..., np.newaxis]
+        return alpha
+
     for (x, y, w, h) in rects:
         max_dim = max(w, h)
         pad = int((intensity / 100.0) * 0.15 * max_dim)
@@ -265,18 +417,19 @@ def _apply_anonymization(img: np.ndarray, rects: List[Tuple[int, int, int, int]]
         roi = img[py:ey, px:ex]
         if roi.size == 0:
             continue
+
+        # create anonymized ROI in a separate buffer, then blend
         if method == "pixelate":
-            # faster and simpler: resize down then up
             rw = max(1, ex - px)
             rh = max(1, ey - py)
             ds_w = max(1, rw // pixel_scale)
             ds_h = max(1, rh // pixel_scale)
             small = cv2.resize(roi, (ds_w, ds_h), interpolation=cv2.INTER_LINEAR)
-            # nearest gives blocky pixelation; linear can be used as well
-            pixelated = cv2.resize(small, (rw, rh), interpolation=cv2.INTER_NEAREST)
-            img[py:ey, px:ex] = pixelated
+            anonym = cv2.resize(small, (rw, rh), interpolation=cv2.INTER_NEAREST)
         elif method == "black_bar":
+            # Hard-edged black bar - write directly and skip feather blend
             img[py:ey, px:ex] = (0, 0, 0)
+            continue
         else:
             rw = ex - px
             rh = ey - py
@@ -286,8 +439,19 @@ def _apply_anonymization(img: np.ndarray, rects: List[Tuple[int, int, int, int]]
                 kW += 1
             if kH % 2 == 0:
                 kH += 1
-            blurred = cv2.GaussianBlur(roi, (kW, kH), 0)
-            img[py:ey, px:ex] = blurred
+            # avoid absurdly large kernels on small ROIs
+            kW = min(kW, max(3, rw | 1))
+            kH = min(kH, max(3, rh | 1))
+            anonym = cv2.GaussianBlur(roi, (kW, kH), 0)
+
+        # Blend anonymized ROI with original ROI using a feathered elliptical alpha mask.
+        h_roi, w_roi = anonym.shape[:2]
+        alpha = _elliptical_alpha(h_roi, w_roi, inset_pct=0.08, feather_frac=0.25)
+        roi_f = roi.astype(np.float32)
+        anonym_f = anonym.astype(np.float32)
+        blended = (anonym_f * alpha) + (roi_f * (1.0 - alpha))
+        img[py:ey, px:ex] = np.clip(blended, 0, 255).astype(img.dtype)
+
     return img
 
 
@@ -300,9 +464,84 @@ def process_array(img: np.ndarray, method: str = "blur", intensity: int = 30) ->
     return img, len(rects)
 
 
+def probe_video_faces(input_path: str, max_frames: int = 90, fast: bool = False) -> int:
+    """Open video, iterate up to max_frames, reuse detection path (fast respected), sum faces per processed frame."""
+    p = Path(input_path)
+    if not p.exists():
+        logger.error("Video file not found: %s", input_path)
+        return 0
+    cap = cv2.VideoCapture(str(p))
+    if not cap.isOpened():
+        logger.error("Cannot open input video for probe: %s", input_path)
+        return 0
+    total = 0
+    frames = 0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    target_detect_width = 480 if fast else 640
+    scale = 1.0
+    if width > target_detect_width:
+        scale = float(target_detect_width) / float(width)
+    net = _load_dnn_net()
+    cascades = load_cascades(fast=fast)
+    try:
+        while frames < max_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            detect_gray = gray if scale >= 1.0 else cv2.resize(gray, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+            frame_for_dnn = frame if scale >= 1.0 else cv2.resize(frame, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+            rects: List[Tuple[int, int, int, int]] = []
+            # DNN-first option for probe (full-frame)
+            if _DNN_FIRST and net is not None:
+                try:
+                    dnn_rects = _detect_with_dnn(frame_for_dnn, net, conf_thresh=0.5)
+                    if dnn_rects:
+                        if scale < 1.0:
+                            for (dx, dy, dw, dh) in dnn_rects:
+                                rects.append((int(round(dx / scale)), int(round(dy / scale)), int(round(dw / scale)), int(round(dh / scale))))
+                        else:
+                            rects.extend(dnn_rects)
+                except Exception:
+                    logger.debug("DNN probe detection failed", exc_info=True)
+            if not rects:
+                eq = _get_clahe().apply(detect_gray)
+                minp = max(16, int(30 * scale))
+                r1 = _detect_with_cascades(detect_gray, cascades, sf=1.12, mn=4, min_size_px=minp)
+                r2 = _detect_with_cascades(eq, cascades, sf=1.1, mn=3, min_size_px=minp)
+                faces = _nms(r1 + r2, 0.35)
+                faces = _filter_human_faces(detect_gray, faces, fast=fast)
+                for (x, y, w, h) in faces:
+                    rx = int(round(x / scale))
+                    ry = int(round(y / scale))
+                    rw = int(round(w / scale))
+                    rh = int(round(h / scale))
+                    rects.append((rx, ry, rw, rh))
+                # DNN fallback for probe
+                if not rects and net is not None:
+                    try:
+                        dnn_rects = _detect_with_dnn(frame_for_dnn, net, conf_thresh=0.5)
+                        if dnn_rects:
+                            if scale < 1.0:
+                                for (dx, dy, dw, dh) in dnn_rects:
+                                    rects.append((int(round(dx / scale)), int(round(dy / scale)), int(round(dw / scale)), int(round(dh / scale))))
+                            else:
+                                rects.extend(dnn_rects)
+                    except Exception:
+                        logger.debug("DNN probe fallback failed", exc_info=True)
+            total += len(rects)
+            frames += 1
+    finally:
+        try:
+            cap.release()
+        except Exception:
+            pass
+    return int(total)
+
+
 @lru_cache(maxsize=1)
 def _ffmpeg_path() -> str:
-    """Return path to ffmpeg executable or empty string if not found (cached)."""
     p = shutil.which("ffmpeg") or ""
     if not p:
         logger.debug("ffmpeg not found in PATH")
@@ -486,6 +725,7 @@ def process_video(
 
     Returns (final_output_path, total_faces_processed).
     """
+    global _last_dnn_log_time  # allow updating rate-limited log timestamp
     input_p = Path(input_path)
     if not input_p.exists():
         logger.error("Video file not found: %s", input_path)
@@ -544,6 +784,8 @@ def process_video(
             out_rects.append((x2, y2, max(1, w2), max(1, h2)))
         return out_rects
 
+    net = _load_dnn_net()
+    dnn_used_frames = 0
     try:
         while True:
             ret, frame = cap.read()
@@ -554,10 +796,11 @@ def process_video(
             if width > target_detect_width:
                 scale = float(target_detect_width) / float(width)
             detect_gray = gray if scale >= 1.0 else cv2.resize(gray, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+            frame_for_dnn = frame if scale >= 1.0 else cv2.resize(frame, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
             dyn_fast = fast and len(last_rects) > 0
+            rects: List[Tuple[int, int, int, int]] = []
             if frame_index % (detect_every if dyn_fast else 1) == 0:
                 use_roi = len(last_rects) > 0
-                rects: List[Tuple[int, int, int, int]] = []
                 inv = (1.0 / scale) if scale > 0 else 1.0
                 if use_roi:
                     mx = min([x for (x, y, w, h) in last_rects])
@@ -574,34 +817,89 @@ def process_video(
                     sex = int(round(ex * scale))
                     sey = int(round(ey * scale))
                     roi = detect_gray[spy:sey, spx:sex]
+                    roi_color = frame_for_dnn[spy:sey, spx:sex]
                     if roi.size == 0:
                         faces = []
                     else:
-                        roi_eq = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(roi)
+                        # DNN-first option for ROI
+                        used_dnn_this_frame = False
+                        if _DNN_FIRST and net is not None:
+                            try:
+                                dnn_rects = _detect_with_dnn(roi_color, net, conf_thresh=0.5)
+                                if dnn_rects:
+                                    used_dnn_this_frame = True
+                                    for (dx, dy, dw, dh) in dnn_rects:
+                                        rx = int(round((dx + spx) * inv))
+                                        ry = int(round((dy + spy) * inv))
+                                        rw = int(round(dw * inv))
+                                        rh = int(round(dh * inv))
+                                        rects.append((rx, ry, rw, rh))
+                            except Exception:
+                                logger.debug("DNN ROI detection failed", exc_info=True)
+                        if used_dnn_this_frame:
+                            dnn_used_frames += 1
+                        if not rects:
+                            roi_eq = _get_clahe().apply(roi)
+                            minp = max(16, int(30 * scale))
+                            r1 = _detect_with_cascades(roi, cascades, sf=1.12 if dyn_fast else 1.1, mn=4 if dyn_fast else 4, min_size_px=minp)
+                            r2 = _detect_with_cascades(roi_eq, cascades, sf=1.1 if dyn_fast else 1.06, mn=4 if dyn_fast else 3, min_size_px=minp)
+                            faces = _nms(r1 + r2, 0.35)
+                            faces = _filter_human_faces(roi, faces, fast=dyn_fast)
+                            for (x, y, w, h) in faces:
+                                rx = int(round((x + spx) * inv))
+                                ry = int(round((y + spy) * inv))
+                                rw = int(round(w * inv))
+                                rh = int(round(h * inv))
+                                rects.append((rx, ry, rw, rh))
+                else:
+                    # DNN-first per-frame if requested
+                    if _DNN_FIRST and net is not None:
+                        try:
+                            dnn_rects = _detect_with_dnn(frame_for_dnn, net, conf_thresh=0.5)
+                            if dnn_rects:
+                                if scale < 1.0:
+                                    for (dx, dy, dw, dh) in dnn_rects:
+                                        rects.append((int(round(dx / scale)), int(round(dy / scale)), int(round(dw / scale)), int(round(dh / scale))))
+                                else:
+                                    rects.extend(dnn_rects)
+                                dnn_used_frames += 1
+                                # rate-limited debug
+                                now = time.time()
+                                if now - _last_dnn_log_time >= _dnn_log_interval:
+                                    logger.debug("DNN detection activated during video processing (frame_index=%d)", frame_index)
+                                    _last_dnn_log_time = now
+                        except Exception:
+                            logger.debug("DNN per-frame detection failed", exc_info=True)
+                    if not rects:
+                        eq = _get_clahe().apply(detect_gray)
                         minp = max(16, int(30 * scale))
-                        r1 = _detect_with_cascades(roi, cascades, sf=1.12 if dyn_fast else 1.1, mn=4 if dyn_fast else 4, min_size_px=minp)
-                        r2 = _detect_with_cascades(roi_eq, cascades, sf=1.1 if dyn_fast else 1.06, mn=4 if dyn_fast else 3, min_size_px=minp)
+                        r1 = _detect_with_cascades(detect_gray, cascades, sf=1.12 if dyn_fast else 1.1, mn=4 if dyn_fast else 4, min_size_px=minp)
+                        r2 = _detect_with_cascades(eq, cascades, sf=1.1 if dyn_fast else 1.06, mn=4 if dyn_fast else 3, min_size_px=minp)
                         faces = _nms(r1 + r2, 0.35)
-                        faces = _filter_human_faces(roi, faces, fast=dyn_fast)
+                        faces = _filter_human_faces(detect_gray, faces, fast=dyn_fast)
                         for (x, y, w, h) in faces:
-                            rx = int(round((x + spx) * inv))
-                            ry = int(round((y + spy) * inv))
+                            rx = int(round(x * inv))
+                            ry = int(round(y * inv))
                             rw = int(round(w * inv))
                             rh = int(round(h * inv))
                             rects.append((rx, ry, rw, rh))
-                else:
-                    eq = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(detect_gray)
-                    minp = max(16, int(30 * scale))
-                    r1 = _detect_with_cascades(detect_gray, cascades, sf=1.12 if dyn_fast else 1.1, mn=4 if dyn_fast else 4, min_size_px=minp)
-                    r2 = _detect_with_cascades(eq, cascades, sf=1.1 if dyn_fast else 1.06, mn=4 if dyn_fast else 3, min_size_px=minp)
-                    faces = _nms(r1 + r2, 0.35)
-                    faces = _filter_human_faces(detect_gray, faces, fast=dyn_fast)
-                    for (x, y, w, h) in faces:
-                        rx = int(round(x * inv))
-                        ry = int(round(y * inv))
-                        rw = int(round(w * inv))
-                        rh = int(round(h * inv))
-                        rects.append((rx, ry, rw, rh))
+                        # DNN fallback if cascades produced nothing
+                        if not rects and net is not None:
+                            try:
+                                dnn_rects = _detect_with_dnn(frame_for_dnn, net, conf_thresh=0.5)
+                                if dnn_rects:
+                                    if scale < 1.0:
+                                        for (dx, dy, dw, dh) in dnn_rects:
+                                            rects.append((int(round(dx / scale)), int(round(dy / scale)), int(round(dw / scale)), int(round(dh / scale))))
+                                    else:
+                                        rects.extend(dnn_rects)
+                                    dnn_used_frames += 1
+                                    now = time.time()
+                                    if now - _last_dnn_log_time >= _dnn_log_interval:
+                                        logger.debug("DNN detection activated during video processing (frame_index=%d)", frame_index)
+                                        _last_dnn_log_time = now
+                            except Exception:
+                                logger.debug("DNN per-frame detection failed", exc_info=True)
                 if len(rects) > 0:
                     if len(last_rects) > 0:
                         rects = _smooth_rects(last_rects, rects)
@@ -692,6 +990,11 @@ def process_video(
                     pass
         cap.release()
         writer.release()
+        # DNN usage summary
+        processed_frames = frame_index if frame_index > 0 else 1
+        if dnn_used_frames > 0:
+            pct = int(round(100.0 * dnn_used_frames / processed_frames))
+            logger.info("DNN used on %d frames (%d%% of processed)", dnn_used_frames, pct)
         final_out = str(out_dir / Path(output_path).name)
         temp_exists = Path(temp_out).exists() and Path(temp_out).stat().st_size > 0
         if temp_exists:
@@ -722,3 +1025,42 @@ def process_video(
             pass
         final_out = str(out_dir / Path(output_path).name)
         return final_out, total_faces
+
+
+if __name__ == "__main__":
+    import argparse
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="anonymizer.py CLI - process or probe videos")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_proc = sub.add_parser("process", help="Process a video and anonymize detected faces")
+    p_proc.add_argument("input", help="Input video file")
+    p_proc.add_argument("output", help="Output video file")
+    p_proc.add_argument("--method", default="blur", help="Anonymization method: blur|pixelate|black_bar")
+    p_proc.add_argument("--intensity", type=int, default=30, help="Anonymization intensity 5..100")
+    p_proc.add_argument("--fast", action="store_true", help="Use fast mode")
+    p_proc.add_argument("--dnn-first", action="store_true", help="Try DNN detector before cascades (if model files exist)")
+    p_proc.add_argument("--dnn-log-interval", type=float, default=None, help="Seconds between per-frame DNN debug logs (rate limit)")
+
+    p_probe = sub.add_parser("probe", help="Probe a video to estimate faces present")
+    p_probe.add_argument("input", help="Input video file")
+    p_probe.add_argument("--max-frames", type=int, default=90, help="Max frames to probe")
+    p_probe.add_argument("--fast", action="store_true", help="Use fast probe mode")
+    p_probe.add_argument("--dnn-first", action="store_true", help="Try DNN detector before cascades (if model files exist)")
+    p_probe.add_argument("--dnn-log-interval", type=float, default=None, help="Seconds between per-frame DNN debug logs (rate limit)")
+
+    args = parser.parse_args()
+    if getattr(args, "dnn_first", False) or getattr(args, "dnn-first", False):
+        # argparse stores with underscore in dest; safety: set based on either
+        set_dnn_first(True)
+    if getattr(args, "dnn_log_interval", None) is not None:
+        set_dnn_log_interval(getattr(args, "dnn_log_interval"))
+
+    if args.cmd == "process":
+        out, faces = process_video(args.input, args.output, method=args.method, intensity=args.intensity, fast=args.fast)
+        print(f"output: {out}   faces_detected_total: {faces}")
+    elif args.cmd == "probe":
+        found = probe_video_faces(args.input, max_frames=args.max_frames, fast=args.fast)
+        print(found)

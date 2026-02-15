@@ -28,3 +28,17 @@ instance/
 
 # Frontend dependencies
 node_modules/
+
+# ML models and large binaries
+models/
+*.caffemodel
+*.prototxt
+*.prototxt.txt
+
+# Generated test videos/outputs
+test_fast_video.mp4
+sample_cli_test.mp4
+sample_out.mp4
+sample_out_dnn.mp4
+real_face_test.mp4
+real_face_out.mp4
