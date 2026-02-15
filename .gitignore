@@ -12,6 +12,7 @@ venv/
 env/
 
 # IDE/editor
+.vs/
 .vscode/
 *.code-workspace
 
