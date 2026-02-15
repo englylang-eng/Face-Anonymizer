@@ -13,6 +13,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <script id="theme-preload">
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var prefersDark = false;
+          try { prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; } catch(e){}
+          var next = saved ? saved : (prefersDark ? 'dark' : 'light');
+          var doc = document.documentElement;
+          if (next === 'dark') { doc.classList.add('dark'); }
+          else { doc.classList.remove('dark'); }
+          doc.setAttribute('data-theme', next);
+        } catch(e){}
+      })();
+    </script>
     <script>
       (function() {
         var enable = function(){ try { document.documentElement.classList.add('icons-ready'); } catch(e) {} };
@@ -45,7 +60,8 @@
       }
     </script>
     <style>
-      body { font-family: "Space Grotesk", sans-serif; }
+      body { font-family: "Roobert","Space Grotesk",sans-serif; }
+      button, [role="button"], .btn { font-family: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; letter-spacing: 0.01em; }
       ::selection { background-color: #0F0F10; color: #FFFFFF; }
       ::-moz-selection { background-color: #0F0F10; color: #FFFFFF; }
       .dark ::selection { background-color: #EDEDED; color: #0F0F10; }
@@ -94,6 +110,7 @@
         background-color: var(--soft-chip-bg) !important;
         color: var(--soft-chip-fg) !important;
         border: 1px solid var(--soft-surface-border);
+        font-family: "Roobert","Space Grotesk",sans-serif;
       }
       /* Layered surface application */
       body { background-color: var(--app-bg) !important; color: var(--text-primary) !important; }
@@ -109,8 +126,7 @@
       .dark #resultBox { background-color: var(--surface-main) !important; }
       #dropArea { background-color: var(--surface-main) !important; }
       #resultBox { background-color: var(--surface-main) !important; }
-      .dark #themeBtn:hover { background-color: var(--surface-hover) !important; }
-      #themeBtn:hover { background-color: var(--surface-hover) !important; }
+      
       /* Text color application */
       .dark body { color: var(--text-primary) !important; }
       #statusText { color: var(--text-muted) !important; }
@@ -301,12 +317,17 @@
       #homeHeaderLink { cursor: pointer; }
       #anonymizeIcon { transition: filter 160ms ease; filter: invert(1); }
       .dark #anonymizeIcon { filter: invert(0); }
-      #procDots { display: inline-block; width: 3ch; margin-left: 0; }
-      #procDots .dot { visibility: hidden; }
-      #scanDots { display: inline-block; width: 3ch; margin-left: 0; }
-      #scanDots .dot { visibility: hidden; }
-      #finalDots { display: inline-block; width: 3ch; margin-left: 0; }
-      #finalDots .dot { visibility: hidden; }
+      #procDots { display: inline-block; width: 3ch; margin-left: -0.35ch; letter-spacing: 0; word-spacing: 0; line-height: 1; font-kerning: none; font-feature-settings: 'kern' 0; }
+      #procDots .dot { visibility: hidden; margin: 0; padding: 0; display: inline-block; }
+      #scanDots { display: inline-block; width: 3ch; margin-left: -0.35ch; letter-spacing: 0; word-spacing: 0; line-height: 1; font-kerning: none; font-feature-settings: 'kern' 0; }
+      #scanDots .dot { visibility: hidden; margin: 0; padding: 0; display: inline-block; }
+      #finalDots { display: inline-block; width: 3ch; margin-left: -0.35ch; letter-spacing: 0; word-spacing: 0; line-height: 1; font-kerning: none; font-feature-settings: 'kern' 0; }
+      #finalDots .dot { visibility: hidden; margin: 0; padding: 0; display: inline-block; }
+      /* Ensure Processing... in the Anonymize button stays on one line and flush */
+      #anonymizeBtn #procDots { display: inline-block; width: 3ch; margin-left: 0; letter-spacing: 0; word-spacing: 0; line-height: 1; white-space: nowrap; font-kerning: none; font-feature-settings: 'kern' 0; }
+      #anonymizeBtn #procDots .dot { display: inline-block; visibility: hidden; margin: 0; padding: 0; vertical-align: baseline; }
+      /* Keep button ellipsis tight and single-line */
+      
       #intensityRange {
         -webkit-appearance: none;
         -moz-appearance: none;
@@ -439,6 +460,9 @@
         z-index: 50;
         overflow: hidden;
       }
+      #typeSelectBtn { width: auto; }
+      #typeMenu { min-width: 100%; }
+      
       .dark #typeMenu { background: var(--surface-elevated); border-color: var(--surface-border); box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.35), 0 3px 6px -4px rgba(0, 0, 0, 0.45), 0 9px 28px 8px rgba(0, 0, 0, 0.35); }
       .select-open #typeMenu { display: block; }
       #typeMenu li {
@@ -446,6 +470,8 @@
         font-size: 0.875rem;
         font-weight: 600;
         color: var(--text-primary);
+        font-family: "Roobert","Space Grotesk",sans-serif;
+        letter-spacing: 0.02em;
         cursor: pointer;
       }
       .dark #typeMenu li { color: var(--text-primary); }
@@ -541,7 +567,7 @@
           </div>
         </div>
         <div class="flex items-center gap-4 justify-self-end">
-          <button id="themeBtn" class="relative overflow-hidden flex items-center justify-center rounded-lg h-10 w-10 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors" title="Appearance">
+          <button id="themeBtn" class="relative overflow-hidden flex items-center justify-center rounded-lg h-10 w-10 text-slate-600 dark:text-slate-300 transition-colors" title="Appearance">
             <span id="themeIcon" class="material-symbols-outlined text-[32px]">light_mode</span>
           </button>
         </div>
@@ -613,19 +639,19 @@
           </div>
         </div>
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm glass-panel dark:bg-slate-800">
-          <div class="flex flex-col lg:flex-row items-center gap-10 lg:gap-12 lg:justify-center">
-            <div class="flex flex-col md:flex-row items-start gap-8 md:gap-10 w-full lg:w-auto">
+          <div class="flex flex-col lg:flex-row items-center gap-6 lg:gap-8 lg:justify-center">
+            <div class="flex flex-col md:flex-row items-start gap-6 md:gap-8 w-full lg:w-auto">
               <div class="flex flex-col gap-2 py-2 w-full md:w-56">
                 <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Anonymization Type</label>
                 <div id="typeSelectWrapper" class="relative">
-                  <input id="typeSelect" type="hidden" value="blur" />
+                  <input id="typeSelect" type="hidden" value="pixelate" />
                   <button id="typeSelectBtn" type="button" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 border rounded-lg py-3 pl-3 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all relative flex items-center" aria-expanded="false" aria-haspopup="listbox" aria-controls="typeMenu">
-                    <span id="typeSelectText">Gaussian Blur (Default)</span>
+                    <span id="typeSelectText">Pixelation Grid</span>
                     <span class="material-symbols-outlined select-arrow text-slate-500 dark:text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
                   </button>
                   <ul id="typeMenu" role="listbox" aria-label="Anonymization Type">
-                    <li role="option" tabindex="0" data-value="blur">Gaussian Blur (Default)</li>
                     <li role="option" tabindex="0" data-value="pixelate">Pixelation Grid</li>
+                    <li role="option" tabindex="0" data-value="blur">Gaussian Blur</li>
                     <li role="option" tabindex="0" data-value="black_bar">Censored Black Bar</li>
                   </ul>
                 </div>
@@ -645,12 +671,11 @@
                 </div>
               </div>
             </div>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 w-full lg:w-auto pt-4 lg:pt-0 self-center mx-auto">
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3 w-full lg:w-auto pt-2 lg:pt-0 self-center mx-auto">
               <button id="anonymizeBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-on-primary rounded-xl font-bold transition-all shadow-lg shadow-primary/20 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 border border-transparent">
                 <span id="anonymizeText" class="leading-none">Anonymize</span>
               </button>
-              <button id="clearBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold transition-all dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
-                <span class="material-symbols-outlined text-[28px]">restart_alt</span>
+              <button id="clearBtn" class="w-full sm:w-auto flex items-center justify-center px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold transition-all dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
                 Clear
               </button>
             </div>
@@ -747,6 +772,31 @@
       }
       requestAnimationFrame(equalizeButtons);
       window.addEventListener('resize', () => { equalizeButtons(); });
+      function setAnonymizeBaseWidth() {
+        if (!anonymizeBtn) return;
+        const p = document.createElement('span');
+        p.style.position = 'absolute';
+        p.style.visibility = 'hidden';
+        p.style.pointerEvents = 'none';
+        p.style.whiteSpace = 'nowrap';
+        p.className = '';
+        p.innerHTML = 'Processing <span id="tmpDots"><span>.</span><span>.</span><span>.</span></span>';
+        anonymizeBtn.appendChild(p);
+        const w2 = Math.round(p.offsetWidth);
+        p.remove();
+        const a = document.createElement('span');
+        a.style.position = 'absolute';
+        a.style.visibility = 'hidden';
+        a.style.pointerEvents = 'none';
+        a.style.whiteSpace = 'nowrap';
+        a.textContent = 'Anonymize';
+        anonymizeBtn.appendChild(a);
+        const w1 = Math.round(a.offsetWidth);
+        a.remove();
+        const w = Math.max(w1, w2);
+        if (w > 0) anonymizeBtn.style.minWidth = w + 32 + 'px';
+      }
+      requestAnimationFrame(() => { setTimeout(setAnonymizeBaseWidth, 0); });
       let busy = false;
       window.addEventListener('beforeunload', (e) => {
         if (busy || resultBlobUrl) {
@@ -773,7 +823,7 @@
         progressValue = 0;
         lastProgressDisplay = 0;
         progressStartTime = performance.now();
-        const label = kind === 'video' ? 'Processing video' : 'Processing image';
+        const label = 'Scan for faces';
         resultBox.innerHTML = `
           <div class="w-full mx-auto flex flex-col items-center justify-center gap-3 p-4" style="width: min(100%, 260px);">
             <p id="progressLabel" class="text-sm font-semibold text-slate-900 dark:text-slate-100">${label}</p>
@@ -797,7 +847,7 @@
           if (pct) {
             if (disp >= 95) {
               if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
-              pct.innerHTML = 'Finalizing <span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
+              pct.innerHTML = '<span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
               finalizeAnimStep = 0;
               finalizeAnimTimer = setInterval(() => {
                 const dots = document.querySelectorAll('#finalDots .dot');
@@ -839,7 +889,7 @@
         const label = 'Scanning for faces';
         resultBox.innerHTML = `
           <div class="w-full mx-auto flex flex-col items-center justify-center gap-3 p-4" style="width: min(100%, 260px);">
-            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">${label} <span id="scanDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></p>
+            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">${label}<span id="scanDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></p>
           </div>
         `;
         if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
@@ -874,13 +924,37 @@
       }
       function setProgressBar(value, labelText) {
         const v = Math.max(0, Math.min(100, Number(value) || 0));
-        lastProgressDisplay = Math.max(lastProgressDisplay || 0, v);
+        const nv = Math.max(lastProgressDisplay || 0, v);
+        lastProgressDisplay = nv;
         const bar = document.getElementById('progressBarInner');
         const pct = document.getElementById('progressPercent');
-        if (bar) bar.style.width = v + '%';
+        if (bar) bar.style.width = nv + '%';
         if (pct) {
-          if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
-          pct.textContent = Math.round(v) + '%';
+          if (nv >= 95) {
+            if (!pct.getAttribute('data-finalizing')) {
+              pct.setAttribute('data-finalizing', '1');
+              pct.innerHTML = 'Finalizing<span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
+              finalizeAnimStep = 0;
+              try {
+                const dotsNow = document.querySelectorAll('#finalDots .dot');
+                if (dotsNow && dotsNow.length) {
+                  dotsNow.forEach((d, i) => { d.style.visibility = i === 0 ? 'visible' : 'hidden'; });
+                }
+              } catch {}
+              if (!finalizeAnimTimer) {
+                finalizeAnimTimer = setInterval(() => {
+                  const dots = document.querySelectorAll('#finalDots .dot');
+                  if (!dots || dots.length === 0) return;
+                  finalizeAnimStep = (finalizeAnimStep + 1) % 3;
+                  dots.forEach((d, i) => { d.style.visibility = i <= finalizeAnimStep ? 'visible' : 'hidden'; });
+                }, 500);
+              }
+            }
+          } else {
+            pct.removeAttribute('data-finalizing');
+            if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
+            pct.textContent = Math.round(nv) + '%';
+          }
         }
         if (labelText) {
           const lbl = document.getElementById('progressLabel');
@@ -889,7 +963,24 @@
       }
       function beginProcessingProgress(kind) {
         const lbl = document.getElementById('progressLabel');
-        if (lbl) lbl.textContent = kind === 'video' ? 'Processing video' : 'Processing image';
+        if (!lbl) {
+          // Create progress UI lazily so we only show it after success
+          const k = kind === 'video' ? 'Processing video' : 'Processing image';
+          try {
+            resultBox.innerHTML = `
+              <div class="w-full mx-auto flex flex-col items-center justify-center gap-3 p-4" style="width: min(100%, 260px);">
+                <p id="progressLabel" class="text-sm font-semibold text-slate-900 dark:text-slate-100">${k}</p>
+                <div id="progressBarWrap" class="relative w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden border border-slate-300 dark:border-slate-700">
+                  <div id="progressBarInner" class="h-full bg-primary transition-all" style="width: 0%;"></div>
+                  <div id="progressStripe" class="absolute inset-0 rounded-full bar-stripes" style="display:none;"></div>
+                </div>
+                <span id="progressPercent" class="text-xs font-bold text-slate-700 dark:text-slate-300">0%</span>
+              </div>
+            `;
+          } catch {}
+        } else {
+          lbl.textContent = kind === 'video' ? 'Processing video' : 'Processing image';
+        }
         progressValue = Math.max(Number(lastProgressDisplay || 0), 5);
         if (progressTimer) { clearInterval(progressTimer); }
         progressTimer = setInterval(() => {
@@ -903,17 +994,28 @@
           if (bar) bar.style.width = disp + '%';
           if (pct) {
             if (disp >= 95) {
-              if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
-              pct.innerHTML = 'Finalizing <span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
-              finalizeAnimStep = 0;
-              finalizeAnimTimer = setInterval(() => {
-                const dots = document.querySelectorAll('#finalDots .dot');
-                if (!dots || dots.length === 0) return;
-                finalizeAnimStep = (finalizeAnimStep + 1) % 3;
-                dots.forEach((d, i) => { d.style.visibility = i <= finalizeAnimStep ? 'visible' : 'hidden'; });
-              }, 500);
+              if (!pct.getAttribute('data-finalizing')) {
+                pct.setAttribute('data-finalizing', '1');
+                pct.innerHTML = 'Finalizing<span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
+                finalizeAnimStep = 0;
+                try {
+                  const dotsNow = document.querySelectorAll('#finalDots .dot');
+                  if (dotsNow && dotsNow.length) {
+                    dotsNow.forEach((d, i) => { d.style.visibility = i === 0 ? 'visible' : 'hidden'; });
+                  }
+                } catch {}
+                if (!finalizeAnimTimer) {
+                  finalizeAnimTimer = setInterval(() => {
+                    const dots = document.querySelectorAll('#finalDots .dot');
+                    if (!dots || dots.length === 0) return;
+                    finalizeAnimStep = (finalizeAnimStep + 1) % 3;
+                    dots.forEach((d, i) => { d.style.visibility = i <= finalizeAnimStep ? 'visible' : 'hidden'; });
+                  }, 500);
+                }
+              }
             } else {
               if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
+              if (pct.getAttribute('data-finalizing')) pct.removeAttribute('data-finalizing');
               pct.textContent = Math.round(disp) + '%';
             }
           }
@@ -1010,14 +1112,31 @@
       }
 
       function applyTheme(t) {
+        if (!t) return;
         const isDark = t === 'dark';
+        const next = isDark ? 'dark' : 'light';
+        if (window.__lastTheme === next) return;
+        try { document.body.classList.remove('dark'); } catch {}
         document.documentElement.classList.toggle('dark', isDark);
-        themeIcon.textContent = isDark ? 'dark_mode' : 'light_mode';
+        document.documentElement.setAttribute('data-theme', next);
+        if (themeIcon) themeIcon.textContent = isDark ? 'dark_mode' : 'light_mode';
+        window.__lastTheme = next;
       }
       function initTheme() {
-        const saved = localStorage.getItem('theme');
-        const mode = saved || 'light';
-        applyTheme(mode);
+        if (window.__themeInitDone) return;
+        window.__themeInitDone = true;
+        try {
+          const saved = localStorage.getItem('theme');
+          let mode = saved;
+          if (!mode) {
+            try {
+              mode = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+            } catch { mode = 'light'; }
+          }
+          applyTheme(mode || 'light');
+        } catch {
+          applyTheme('light');
+        }
       }
       if (window.matchMedia) {
         const mm = window.matchMedia('(prefers-color-scheme: dark)');
@@ -1123,12 +1242,20 @@
         const top = Math.round(btn.offsetTop) + inset;
         const width = Math.max(0, Math.round(btn.offsetWidth) - inset * 2);
         const height = Math.max(0, Math.round(btn.offsetHeight) - inset * 2);
-        requestAnimationFrame(() => {
+        // During initial layout (indicator-init), apply styles synchronously to avoid slide-in animation
+        if (container.classList && container.classList.contains('indicator-init')) {
           indicator.style.left = `${left}px`;
           indicator.style.top = `${top}px`;
           indicator.style.width = `${width}px`;
           indicator.style.height = `${height}px`;
-        });
+        } else {
+          requestAnimationFrame(() => {
+            indicator.style.left = `${left}px`;
+            indicator.style.top = `${top}px`;
+            indicator.style.width = `${width}px`;
+            indicator.style.height = `${height}px`;
+          });
+        }
       }
       function recalcTabIndicators() {
         try {
@@ -1161,7 +1288,7 @@
           return;
         }
         if (resultBlobUrl && downloadBtn && !downloadBtn.hasAttribute('disabled')) {
-          const proceed = window.confirm('A result is ready. Switching tabs will clear it. Continue?');
+          const proceed = window.confirm('A result is ready to download. Switching tabs will clear it. Continue?');
           if (!proceed) return;
           try { URL.revokeObjectURL(resultBlobUrl); } catch {}
           resultBlobUrl = null;
@@ -1206,7 +1333,7 @@
         } else {
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized video will appear here</p>`;
         }
-        setDownloadEnabled(false);
+        // keep previous downloadable result until next anonymize
         setAnonymizeEnabled(false, false);
         updateMetrics({ faces: null, ms: null, type: '', status: '' });
       }
@@ -1317,7 +1444,6 @@
       };
       intensityRange.addEventListener('input', () => {
         scheduleIntensityUpdate(true);
-        if (resultBlobUrl) setDownloadEnabled(false);
       }, { passive: true });
       intensityRange.addEventListener('change', () => {
         scheduleIntensityUpdate(true);
@@ -1339,7 +1465,7 @@
       const typeSelectBtn = document.getElementById('typeSelectBtn');
       const typeSelectText = document.getElementById('typeSelectText');
       const typeMenu = document.getElementById('typeMenu');
-      const TYPE_LABELS = { blur: 'Gaussian Blur (Default)', pixelate: 'Pixelation Grid', black_bar: 'Censored Black Bar' };
+      const TYPE_LABELS = { blur: 'Gaussian Blur', pixelate: 'Pixelation Grid', black_bar: 'Censored Black Bar' };
       typeSelect.addEventListener('change', () => {
         const txt = TYPE_LABELS[typeSelect.value] || typeSelect.value;
         statusText.textContent = `Type: ${txt}`;
@@ -1347,6 +1473,28 @@
       if (typeSelectWrapper && typeSelectBtn && typeMenu && typeSelectText && typeSelect) {
         const closeMenu = () => { typeSelectWrapper.classList.remove('select-open'); typeSelectBtn.setAttribute('aria-expanded','false'); };
         const openMenu = () => { typeSelectWrapper.classList.add('select-open'); typeSelectBtn.setAttribute('aria-expanded','true'); };
+        // Fix Type button width to longest option so it never resizes on selection
+        (function fixTypeSelectWidthToLongest(){
+          try {
+            const liNodes = Array.from(typeMenu.querySelectorAll('li'));
+            if (!liNodes.length) return;
+            const clone = typeSelectBtn.cloneNode(true);
+            clone.style.position = 'absolute';
+            clone.style.visibility = 'hidden';
+            clone.style.pointerEvents = 'none';
+            clone.style.left = '-99999px';
+            clone.style.top = '-99999px';
+            document.body.appendChild(clone);
+            let maxW = Math.round(typeSelectBtn.offsetWidth);
+            const textNode = clone.querySelector('#typeSelectText');
+            liNodes.forEach(li => {
+              if (textNode) textNode.textContent = (li.textContent || '').trim();
+              maxW = Math.max(maxW, Math.round(clone.offsetWidth));
+            });
+            clone.remove();
+            if (maxW > 0) typeSelectBtn.style.minWidth = maxW + 'px';
+          } catch {}
+        })();
         typeSelectBtn.addEventListener('click', () => {
           if (typeSelectWrapper.classList.contains('select-open')) closeMenu(); else openMenu();
         });
@@ -1447,8 +1595,8 @@
         updateMetrics({ faces: null, ms: null, type: '', status: '' });
         // reset controls
         if (typeSelect && typeSelectText) {
-          typeSelect.value = 'blur';
-          typeSelectText.textContent = 'Gaussian Blur (Default)';
+          typeSelect.value = 'pixelate';
+          typeSelectText.textContent = 'Pixelation Grid';
         }
         if (intensityRange && intensityLabel) {
           intensityRange.value = 30;
@@ -1468,6 +1616,12 @@
       async function runAnonymize() {
         if (busy) return;
         if (!selectedFile) { toast('Please upload an image first', 'warning', 2000); return; }
+        // Clear any previous downloadable result when starting a new run, even with same file
+        if (resultBlobUrl) {
+          try { URL.revokeObjectURL(resultBlobUrl); } catch {}
+          resultBlobUrl = null;
+          setDownloadEnabled(false);
+        }
         let start = 0;
         let success = false;
         let slowTimer = null;
@@ -1481,14 +1635,22 @@
           vfd.append('image', selectedFile);
           const vresp = await fetch(`${API_BASE}/api/validate_image`, { method: 'POST', body: vfd });
           if (!vresp.ok) {
-            clearRejectedUpload('No faces detected, or the image is invalid');
+            try { startChecking('image'); } catch {}
+            setTimeout(() => { try { clearRejectedUpload('No faces detected, or the image is invalid'); } catch {} }, 800);
             busy = false;
+            try { setTabsInteractivity(true); } catch {}
+            try { setAnonymizeEnabled(true, false); } catch {}
+            try { setSettingsEnabled(true); } catch {}
             return;
           }
           const vj = await vresp.json();
           if (!vj.ok || Number(vj.faces || 0) <= 0) {
-            clearRejectedUpload('No faces found');
+            try { startChecking('image'); } catch {}
+            setTimeout(() => { try { clearRejectedUpload('No faces found'); } catch {} }, 800);
             busy = false;
+            try { setTabsInteractivity(true); } catch {}
+            try { setAnonymizeEnabled(true, false); } catch {}
+            try { setSettingsEnabled(true); } catch {}
             return;
           }
           start = performance.now();
@@ -1510,7 +1672,6 @@
           networkTimer = setTimeout(() => {
             try { if (currentAbortController) currentAbortController.abort(); } catch {}
           }, 120000);
-          startUploadProgress('image');
           const blob = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `${API_BASE}/api/anonymize`);
@@ -1518,22 +1679,35 @@
             if (currentAbortController && currentAbortController.signal) {
               currentAbortController.signal.addEventListener('abort', () => { try { xhr.abort(); } catch {} });
             }
-            xhr.upload.onprogress = (e) => {
-              if (e && e.lengthComputable) {
-                const pct = Math.max(0, Math.min(100, (e.loaded / e.total) * 100));
-                setProgressBar(pct, 'Uploading image');
-                lastProgressDisplay = pct;
-              }
-            };
-            xhr.upload.onloadend = () => {
-              beginProcessingProgress('image');
-            };
             xhr.onerror = () => reject(new Error('Network error during upload'));
             xhr.ontimeout = () => reject(new Error('Upload timed out'));
             xhr.onload = () => {
               if (xhr.status >= 200 && xhr.status < 300) {
+                beginProcessingProgress('image');
                 resolve(xhr.response);
               } else {
+                const ct = (xhr.getResponseHeader('Content-Type') || '').toLowerCase();
+                const blob = xhr.response;
+                if (blob && ct.includes('application/json')) {
+                  try {
+                    const fr = new FileReader();
+                    fr.onload = () => {
+                      try {
+                        const txt = fr.result || '';
+                        const j = JSON.parse(String(txt || ''));
+                        const msg = j && j.error ? j.error : 'Image processing failed';
+                        reject(new Error(msg));
+                      } catch {
+                        reject(new Error('Image processing failed'));
+                      }
+                    };
+                    fr.onerror = () => reject(new Error('Image processing failed'));
+                    fr.readAsText(blob);
+                    return;
+                  } catch {
+                    // fallthrough
+                  }
+                }
                 reject(new Error('Image processing failed'));
               }
             };
@@ -1546,8 +1720,14 @@
           if (err && err.name === 'AbortError') {
             // cancelled
           } else {
-            logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
-            toast(err && err.message ? err.message : 'Could not process image', 'error', 6000);
+            const emsg = (err && err.message ? String(err.message).toLowerCase() : '');
+            if (emsg.includes('no face')) {
+              clearRejectedUpload('No faces found');
+            } else {
+              logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
+              try { startChecking('image'); } catch {}
+              setTimeout(() => { try { clearRejectedUpload('Processing failed'); } catch {} }, 600);
+            }
           }
         } finally {
           if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
@@ -1571,6 +1751,12 @@
       async function runAnonymizeVideo() {
         if (busy) return;
         if (!selectedFile) { toast('Please select a video first', 'warning', 2000); return; }
+        // Clear any previous downloadable result when starting a new run, even with same file
+        if (resultBlobUrl) {
+          try { URL.revokeObjectURL(resultBlobUrl); } catch {}
+          resultBlobUrl = null;
+          setDownloadEnabled(false);
+        }
         let start = 0;
         let success = false;
         let slowTimer = null;
@@ -1594,8 +1780,14 @@
               throw new Error('No faces found');
             }
           } catch (e) {
-            clearRejectedUpload(e && e.message ? e.message : 'Video validation failed');
+            try { startChecking('video'); } catch {}
+            setTimeout(() => {
+              try { clearRejectedUpload(e && e.message ? e.message : 'Video validation failed'); } catch {}
+            }, 800);
             busy = false;
+            try { setTabsInteractivity(true); } catch {}
+            try { setAnonymizeEnabled(true, false); } catch {}
+            try { setSettingsEnabled(true); } catch {}
             return;
           }
           const snapType = String(typeSelect.value);
@@ -1626,12 +1818,25 @@
               if (e && e.lengthComputable) {
                 const pct = Math.max(0, Math.min(100, (e.loaded / e.total) * 100));
                 setProgressBar(pct, 'Uploading video');
-                lastProgressDisplay = pct;
+                lastProgressDisplay = Math.max(lastProgressDisplay || 0, pct);
               }
             };
             xhr.upload.onloadend = () => {
               const lbl = document.getElementById('progressLabel');
               if (lbl) lbl.textContent = 'Processing video';
+              // Reset progress for processing phase so we don't carry over 100% from upload
+              progressValue = 0;
+              lastProgressDisplay = 0;
+              const pctEl = document.getElementById('progressPercent');
+              const barEl = document.getElementById('progressBarInner');
+              const stripeEl = document.getElementById('progressStripe');
+              if (pctEl) {
+                pctEl.removeAttribute('data-finalizing');
+                pctEl.textContent = '0%';
+              }
+              if (barEl) barEl.style.width = '0%';
+              if (stripeEl) stripeEl.style.display = 'none';
+              if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
             };
             xhr.onerror = () => reject(new Error('Network error during upload'));
             xhr.ontimeout = () => reject(new Error('Upload timed out'));
@@ -1670,7 +1875,33 @@
                 const disp = Math.max(lastProgressDisplay, next);
                 lastProgressDisplay = disp;
                 if (bar) bar.style.width = `${disp}%`;
-                if (pct) pct.textContent = disp >= 95 && !pj.done ? 'Finalizing…' : `${Math.round(disp)}%`;
+                if (pct) {
+                  if (disp >= 95 && !pj.done) {
+                    if (!pct.getAttribute('data-finalizing')) {
+                      pct.setAttribute('data-finalizing', '1');
+                      pct.innerHTML = 'Finalizing<span id="finalDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>';
+                      finalizeAnimStep = 0;
+                      try {
+                        const dotsNow = document.querySelectorAll('#finalDots .dot');
+                        if (dotsNow && dotsNow.length) {
+                          dotsNow.forEach((d, i) => { d.style.visibility = i === 0 ? 'visible' : 'hidden'; });
+                        }
+                      } catch {}
+                      if (!finalizeAnimTimer) {
+                        finalizeAnimTimer = setInterval(() => {
+                          const dots = document.querySelectorAll('#finalDots .dot');
+                          if (!dots || dots.length === 0) return;
+                          finalizeAnimStep = (finalizeAnimStep + 1) % 3;
+                          dots.forEach((d, i) => { d.style.visibility = i <= finalizeAnimStep ? 'visible' : 'hidden'; });
+                        }, 500);
+                      }
+                    }
+                  } else {
+                    if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
+                    if (pct.getAttribute('data-finalizing')) pct.removeAttribute('data-finalizing');
+                    pct.textContent = `${Math.round(disp)}%`;
+                  }
+                }
                 if (stripe) stripe.style.display = next >= 95 && !pj.done ? 'block' : 'none';
                 if (pj.done) {
                   if (jobPollTimer) { clearInterval(jobPollTimer); jobPollTimer = null; }
@@ -1694,8 +1925,14 @@
           if (err && err.name === 'AbortError') {
             // cancelled
           } else {
-            logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
-            toast(err && err.message ? err.message : 'Could not process video', 'error', 6000);
+            const emsg = (err && err.message ? String(err.message).toLowerCase() : '');
+            if (emsg.includes('no face')) {
+              clearRejectedUpload('No faces found');
+            } else {
+              logMsg(err && (err.stack || err.message) ? (err.stack || err.message) : String(err), 'error');
+              try { startChecking('video'); } catch {}
+              setTimeout(() => { try { clearRejectedUpload('Processing failed'); } catch {} }, 600);
+            }
           }
         } finally {
           if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
@@ -1712,7 +1949,11 @@
               <source src="${resultBlobUrl}" type="video/mp4">
             </video>`;
             const vid = resultBox.querySelector('video');
-            vid.addEventListener('error', () => {
+            if (vid) {
+              try { vid.load(); } catch {}
+              // ensure the new source is applied even on aggressive mobile caching
+            }
+            vid && vid.addEventListener('error', () => {
               toast('Unable to preview video (codec or format not supported)', 'error', 6000);
             });
             setDownloadEnabled(true);
@@ -1814,7 +2055,7 @@
         } else {
           if (processing) {
             processingAnimStep = 0;
-            anonymizeBtn.innerHTML = `Processing <span id="procDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>`;
+            anonymizeBtn.innerHTML = `<span class="leading-none">Processing <span id="procDots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></span>`;
             if (processingAnimTimer) { clearInterval(processingAnimTimer); }
             processingAnimTimer = setInterval(() => {
               processingAnimStep = (processingAnimStep + 1) % 3;
@@ -1840,6 +2081,12 @@
       }
 
       function clearRejectedUpload(message = '') {
+        try { if (progressTimer) { clearInterval(progressTimer); } } catch {}
+        try { if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); } } catch {}
+        try { if (scanAnimTimer) { clearInterval(scanAnimTimer); } } catch {}
+        progressTimer = null;
+        finalizeAnimTimer = null;
+        scanAnimTimer = null;
         try {
           if (selectedPreviewUrl) { URL.revokeObjectURL(selectedPreviewUrl); selectedPreviewUrl = null; }
         } catch {}
@@ -1855,20 +2102,34 @@
         } else {
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-4xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized video will appear here</p>`;
         }
-        setDownloadEnabled(false);
+        // keep previous downloadable result; only clear on anonymize
         setAnonymizeEnabled(false, false);
         const input = document.getElementById('fileInput');
         const vinput = document.getElementById('videoInput');
         try { if (input) input.value = ''; } catch {}
         try { if (vinput) vinput.value = ''; } catch {}
         const msg = message ? `Upload cleared — ${message}` : 'Upload cleared';
-        toast(msg, 'warning', 4500);
+        toast(msg, 'warning', 6000);
       }
 
       async function handleFiles(files) {
         if (!files || !files.length) return;
+        // keep previous downloadable result until user clicks anonymize again
         const f = files[0];
         const mode = source === 'image' ? 'image' : 'video';
+        // Proactively clear any previous result to avoid stale previews (mobile caching quirks)
+        if (resultBlobUrl) {
+          try { URL.revokeObjectURL(resultBlobUrl); } catch {}
+          resultBlobUrl = null;
+          setDownloadEnabled(false);
+          try {
+            if (resultBox) {
+              resultBox.innerHTML = mode === 'image'
+                ? `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized image will appear here</p>`
+                : `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized video will appear here</p>`;
+            }
+          } catch {}
+        }
         const res = await validateFile(f, mode);
         if (!res.ok) {
           logMsg(res.msg, 'warn');
@@ -1901,7 +2162,7 @@
             } catch {}
           }
         }
-        setDownloadEnabled(false);
+        // keep previous downloadable result until next anonymize
         setAnonymizeEnabled(true, false);
         const kind = mode === 'image' ? 'Image' : 'Video';
         toast(`${kind} uploaded`, 'success', 1600);
@@ -2047,13 +2308,32 @@
       downloadBtn.addEventListener('click', () => {
         if (!resultBlobUrl || downloadBtn.hasAttribute('disabled')) return;
         logMsg('Downloading result...', 'info');
-        const a = document.createElement('a');
-        a.href = resultBlobUrl;
-        a.download = source === 'image' ? 'anonymized.jpg' : 'anonymized.mp4';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast('Downloaded successfully', 'success', 1600);
+        // iOS Safari doesn't honor the download attribute for Blob URLs
+        const ua = (navigator.userAgent || '').toLowerCase();
+        const isIOS = /iphone|ipad|ipod/.test(ua);
+        const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/.test(ua);
+        if (isIOS && isSafari) {
+          try {
+            window.open(resultBlobUrl, '_blank', 'noopener,noreferrer');
+            toast('Opened in a new tab — use Share/Save to download', 'info', 3000);
+          } catch {
+            const a = document.createElement('a');
+            a.href = resultBlobUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = resultBlobUrl;
+          a.download = source === 'image' ? 'anonymized.jpg' : 'anonymized.mp4';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          toast('Downloaded successfully', 'success', 1600);
+        }
       });
       function mapIntensityToBlur(percent) {
         const p = Math.max(5, Math.min(100, Number(percent)));
