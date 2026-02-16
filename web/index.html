@@ -7,6 +7,9 @@
     <link id="favicon" rel="icon" type="image/png" sizes="32x32" href="/favicon.png?size=32"/>
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png?size=16"/>
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png?size=180"/>
+    <link rel="manifest" href="/web/manifest.webmanifest"/>
+    <meta name="theme-color" content="#0F0F10"/>
+    <link rel="mask-icon" href="/web/safari-pinned-tab.svg" color="#0F0F10"/>
     <!-- Tailwind: compiled CSS for production -->
     <link rel="stylesheet" href="/web/assets/tailwind.css"/>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -162,7 +165,7 @@
       .dark .border-slate-700 { border-color: var(--surface-border) !important; }
       .bg-slate-50, .bg-slate-100 { background-color: var(--surface-elevated) !important; }
       .dark .bg-slate-900, .dark .bg-slate-800 { background-color: var(--surface-main) !important; }
-      @media (max-width: 640px) {
+      @media (max-width: 768px) {
         html, body { overflow-y: auto; -webkit-overflow-scrolling: touch; height: auto; }
         html, body { scrollbar-width: none; -ms-overflow-style: none; }
         html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display: none; }
@@ -659,8 +662,8 @@
               <div class="flex flex-col gap-2 py-2 w-full md:w-40">
                 <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Intensity</label>
                 <div class="flex items-center gap-2 py-3">
-                  <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="30"/>
-                  <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">30%</span>
+                  <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="50"/>
+                  <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">50%</span>
                 </div>
               </div>
               <div class="flex flex-col gap-2 py-2 w-full md:w-64">
@@ -1436,10 +1439,7 @@
         intensityRaf = requestAnimationFrame(() => {
           intensityRaf = 0;
           updateIntensityUI();
-          if (updateStatus) {
-            const val = String(intensityRange.value);
-            if (statusText) statusText.textContent = `Intensity (${val}%)`;
-          }
+          // Do not modify statusText here; it should only reflect the uploaded file name
         });
       };
       intensityRange.addEventListener('input', () => {
@@ -1467,8 +1467,7 @@
       const typeMenu = document.getElementById('typeMenu');
       const TYPE_LABELS = { blur: 'Gaussian Blur', pixelate: 'Pixelation Grid', black_bar: 'Censored Black Bar' };
       typeSelect.addEventListener('change', () => {
-        const txt = TYPE_LABELS[typeSelect.value] || typeSelect.value;
-        statusText.textContent = `Type: ${txt}`;
+        // Do not modify statusText here; it should only reflect the uploaded file name
       });
       if (typeSelectWrapper && typeSelectBtn && typeMenu && typeSelectText && typeSelect) {
         const closeMenu = () => { typeSelectWrapper.classList.remove('select-open'); typeSelectBtn.setAttribute('aria-expanded','false'); };
@@ -1565,7 +1564,7 @@
           currentAbortController === null &&
           statusText && statusText.textContent === 'No file selected yet' &&
           typeSelect && typeSelect.value === 'blur' &&
-          intensityRange && String(intensityRange.value) === '30' &&
+          intensityRange && String(intensityRange.value) === '50' &&
           (!f || f.checked === false);
         if (isDefault) {
           return;
@@ -1599,8 +1598,8 @@
           typeSelectText.textContent = 'Pixelation Grid';
         }
         if (intensityRange && intensityLabel) {
-          intensityRange.value = 30;
-          intensityLabel.textContent = '30%';
+          intensityRange.value = 50;
+          intensityLabel.textContent = '50%';
           updateIntensityUI();
         }
         try {
