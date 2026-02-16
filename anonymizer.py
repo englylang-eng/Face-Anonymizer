@@ -644,12 +644,43 @@ def process_video(
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_p = Path(output_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(out_p), fourcc, fps, (width, height))
-    if not writer.isOpened():
-        logger.error("Cannot open output writer: %s", output_path)
+    # Choose a browser-friendly codec/container. Try H.264 (if available), then VP9/VP8 WebM, then fall back to mp4v.
+    candidates = [
+        ("avc1", ".mp4"),
+        ("H264", ".mp4"),
+        ("X264", ".mp4"),
+        ("VP90", ".webm"),
+        ("VP80", ".webm"),
+        ("mp4v", ".mp4"),
+    ]
+    writer = None
+    chosen = None
+    final_out_p = out_p
+    for fourcc_name, ext in candidates:
+        try:
+            trial_p = out_p.with_suffix(ext)
+            fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
+            w = cv2.VideoWriter(str(trial_p), fourcc, fps, (width, height))
+            if w.isOpened():
+                writer = w
+                chosen = (fourcc_name, ext)
+                final_out_p = trial_p
+                logger.info("Video writer selected: %s -> %s", fourcc_name, trial_p.suffix)
+                break
+            else:
+                try: w.release()
+                except Exception: pass
+        except Exception:
+            try:
+                if 'w' in locals() and w is not None:
+                    w.release()
+            except Exception:
+                pass
+            continue
+    if writer is None or chosen is None:
+        logger.error("Cannot open output writer for any supported codec (tried: %s)", ", ".join([c for c, _ in candidates]))
         return "", 0
     cascades = load_cascades(fast=fast)
     net_caffe = _load_dnn_net()
@@ -896,7 +927,7 @@ def process_video(
             parts.append(f"cascades:{cascade_frames} ({int(round(100.0 * cascade_frames / processed_frames))}%)")
         if parts:
             logger.info("Detectors used - " + ", ".join(parts))
-        return str(out_p), total_faces
+        return str(final_out_p), total_faces
     except KeyboardInterrupt:
         raise
     except Exception:
@@ -905,7 +936,7 @@ def process_video(
             writer.release()
         except Exception:
             pass
-        return str(out_p), total_faces
+        return str(final_out_p), total_faces
 
 
 def probe_video_faces(input_path: str, max_frames: int = 90, fast: bool = False) -> int:

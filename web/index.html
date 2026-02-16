@@ -751,6 +751,7 @@
 
       let selectedFile = null;
       let resultBlobUrl = null;
+      let resultBlobMime = '';
       let selectedPreviewUrl = null;
       let selectedVideoPosterUrl = null;
       let reprocTimer = null;
@@ -1977,11 +1978,13 @@
                   if (pj.faces === 0) {
                     return reject(new Error('No faces found'));
                   }
-                  const dl = await fetch(`${API_BASE}/api/job_download?id=${encodeURIComponent(jobId)}`);
-                  if (!dl.ok) return reject(new Error('Download not ready'));
-                  const blob = await dl.blob();
+                const dl = await fetch(`${API_BASE}/api/job_download?id=${encodeURIComponent(jobId)}`);
+                if (!dl.ok) return reject(new Error('Download not ready'));
+                const headerCt = dl.headers ? (dl.headers.get('Content-Type') || '') : '';
+                const blob = await dl.blob();
                   if (resultBlobUrl) { URL.revokeObjectURL(resultBlobUrl); }
                   resultBlobUrl = URL.createObjectURL(blob);
+                resultBlobMime = blob && blob.type ? blob.type : (headerCt || '');
                   success = true;
                   return resolve(true);
                 }
@@ -2014,17 +2017,35 @@
           if (success && resultBlobUrl) {
             finishProgress();
             await new Promise(r => setTimeout(r, 300));
-            resultBox.innerHTML = `<video class="img-main w-full h-full" controls preload="metadata" playsinline webkit-playsinline controlsList="nodownload noremoteplayback">
-              <source src="${resultBlobUrl}" type="video/mp4">
-            </video>`;
-            const vid = resultBox.querySelector('video');
-            if (vid) {
-              try { vid.load(); } catch {}
-              // ensure the new source is applied even on aggressive mobile caching
+            const canPlay = (() => {
+              try {
+                const vt = document.createElement('video');
+                return resultBlobMime ? vt.canPlayType(resultBlobMime) : '';
+              } catch { return ''; }
+            })();
+            if (canPlay && canPlay.length) {
+              resultBox.innerHTML = `<video class="img-main w-full h-full" controls preload="metadata" playsinline webkit-playsinline controlsList="nodownload noremoteplayback">
+                <source src="${resultBlobUrl}" type="${resultBlobMime}">
+              </video>`;
+              const vid = resultBox.querySelector('video');
+              if (vid) {
+                try { vid.load(); } catch {}
+                vid.addEventListener('error', () => {
+                  toast('Unable to preview video (codec or format not supported)', 'error', 6000);
+                  try {
+                    resultBox.innerHTML = `<div class="text-center text-slate-600 dark:text-slate-300 text-sm">
+                      Preview not supported by this browser.<br/>
+                      <a class="underline text-primary" href="${resultBlobUrl}" download>Download the video</a> or <a class="underline text-primary" href="${resultBlobUrl}" target="_blank" rel="noopener">open in a new tab</a>.
+                    </div>`;
+                  } catch {}
+                });
+              }
+            } else {
+              resultBox.innerHTML = `<div class="text-center text-slate-600 dark:text-slate-300 text-sm">
+                Preview not supported by this browser.<br/>
+                <a class="underline text-primary" href="${resultBlobUrl}" download>Download the video</a> or <a class="underline text-primary" href="${resultBlobUrl}" target="_blank" rel="noopener">open in a new tab</a>.
+              </div>`;
             }
-            vid && vid.addEventListener('error', () => {
-              toast('Unable to preview video (codec or format not supported)', 'error', 6000);
-            });
             setDownloadEnabled(true);
             toast('Anonymized video ready', 'success', 2000);
           }
