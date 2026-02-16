@@ -64,7 +64,7 @@
     </script>
     <style>
       body { font-family: "Roobert","Space Grotesk",sans-serif; }
-      button, [role="button"], .btn { font-family: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; letter-spacing: 0.01em; }
+      button, [role="button"], .btn { font-family: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace !important; letter-spacing: 0.01em; }
       ::selection { background-color: #0F0F10; color: #FFFFFF; }
       ::-moz-selection { background-color: #0F0F10; color: #FFFFFF; }
       .dark ::selection { background-color: #EDEDED; color: #0F0F10; }
@@ -161,11 +161,23 @@
       .dark .text-slate-300 { color: var(--text-secondary) !important; }
       .dark .text-slate-400 { color: var(--text-muted) !important; }
       .dark .text-slate-500 { color: var(--text-disabled) !important; }
+      #statusText { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+      #progressBarInner { transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1); will-change: width; }
       .border-slate-200 { border-color: var(--surface-border) !important; }
       .dark .border-slate-700 { border-color: var(--surface-border) !important; }
       .bg-slate-50, .bg-slate-100 { background-color: var(--surface-elevated) !important; }
       .dark .bg-slate-900, .dark .bg-slate-800 { background-color: var(--surface-main) !important; }
-      @media (max-width: 768px) {
+      /* Cursor hygiene: ensure non-interactive surfaces do not show move cursor */
+      body, main, #resultBox, .img-box, video, .panel-footer, #sourceTabs, #mobileSourceTabs { cursor: default !important; }
+      /* Result image is clickable for preview */
+      #resultBox img.img-main { cursor: pointer !important; }
+      /* Upload card should be clickable */
+      #dropArea, #dropArea * { cursor: pointer !important; }
+      /* Interactive controls use pointer */
+      button, [role="button"], .btn, #typeMenu li, #typeSelectBtn, #themeBtn, #downloadBtn, #anonymizeBtn, #clearBtn, #fastModeToggle, label[for="fastModeToggle"] { cursor: pointer !important; }
+      /* Hide blinking text caret site-wide */
+      html, body, * { caret-color: transparent !important; }
+      @media (max-width: 640px) {
         html, body { overflow-y: auto; -webkit-overflow-scrolling: touch; height: auto; }
         html, body { scrollbar-width: none; -ms-overflow-style: none; }
         html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display: none; }
@@ -217,6 +229,11 @@
           flex: 0 0 auto !important;
           white-space: nowrap !important;
         }
+      }
+      /* Prevent header overlap between ~640px and tablets */
+      @media (min-width: 641px) and (max-width: 750px) {
+        #sourceTabs { display: none; }
+        #mobileSourceTabs { display: flex !important; margin: 8px auto 12px !important; }
       }
       
       
@@ -610,7 +627,7 @@
                 </div>
               </div>
               <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center panel-footer">
-                <span id="statusText" class="text-xs text-slate-500 italic">No file selected yet</span>
+                <span id="statusText" class="text-xs text-slate-500 italic">No file uploaded yet</span>
               </div>
             </div>
           </div>
@@ -631,9 +648,9 @@
                   <p class="text-xs px-12 text-slate-500">Your anonymized image will appear here</p>
                 </div>
               </div>
-              <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-end items-center panel-footer">
+              <div class="px-6 h-16 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end panel-footer">
                 <button id="downloadBtn" class="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold cursor-not-allowed pointer-events-none" disabled>
-                <span class="material-symbols-outlined text-[26px]">download</span>
+                  <span class="material-symbols-outlined text-[26px]">download</span>
                   Download
                 </button>
               </div>
@@ -643,18 +660,18 @@
         </div>
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm glass-panel dark:bg-slate-800">
           <div class="flex flex-col lg:flex-row items-center gap-6 lg:gap-8 lg:justify-center">
-            <div class="flex flex-col md:flex-row items-start gap-6 md:gap-8 w-full lg:w-auto">
+            <div class="flex flex-col md:flex-row items-start gap-6 md:gap-10 lg:gap-12 w-full lg:w-auto">
               <div class="flex flex-col gap-2 py-2 w-full md:w-56">
                 <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Anonymization Type</label>
                 <div id="typeSelectWrapper" class="relative">
-                  <input id="typeSelect" type="hidden" value="pixelate" />
+                  <input id="typeSelect" type="hidden" value="blur" />
                   <button id="typeSelectBtn" type="button" class="w-full bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 border rounded-lg py-3 pl-3 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all relative flex items-center" aria-expanded="false" aria-haspopup="listbox" aria-controls="typeMenu">
-                    <span id="typeSelectText">Pixelation Grid</span>
+                    <span id="typeSelectText">Gaussian Blur</span>
                     <span class="material-symbols-outlined select-arrow text-slate-500 dark:text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
                   </button>
                   <ul id="typeMenu" role="listbox" aria-label="Anonymization Type">
-                    <li role="option" tabindex="0" data-value="pixelate">Pixelation Grid</li>
                     <li role="option" tabindex="0" data-value="blur">Gaussian Blur</li>
+                    <li role="option" tabindex="0" data-value="pixelate">Pixelation Grid</li>
                     <li role="option" tabindex="0" data-value="black_bar">Censored Black Bar</li>
                   </ul>
                 </div>
@@ -662,13 +679,13 @@
               <div class="flex flex-col gap-2 py-2 w-full md:w-40">
                 <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Intensity</label>
                 <div class="flex items-center gap-2 py-3">
-                  <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="50"/>
-                  <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">50%</span>
+                  <input id="intensityRange" class="flex-1 accent-primary h-1.5 bg-slate-200 rounded-full cursor-pointer" max="100" min="5" type="range" value="40"/>
+                  <span id="intensityLabel" class="text-xs font-bold text-slate-900 dark:text-slate-100 w-10">40%</span>
                 </div>
               </div>
-              <div class="flex flex-col gap-2 py-2 w-full md:w-64">
+              <div class="flex flex-col gap-2 py-2 w-full md:w-64 md:ml-6 lg:ml-10">
                 <label class="control-label text-xs font-bold text-slate-500 uppercase tracking-wider">Fast Mode</label>
-                <div class="flex items-center gap-6 py-3">
+                <div class="flex items-center gap-2 py-3">
                   <input id="fastModeToggle" type="checkbox" class="focus:outline-none focus:ring-0 appearance-none"/>
                   <label for="fastModeToggle" class="text-[15px] text-slate-600 dark:text-slate-300 whitespace-nowrap">Faster result, lower quality</label>
                 </div>
@@ -716,6 +733,7 @@
       const intensityLabel = document.getElementById('intensityLabel');
       const typeSelect = document.getElementById('typeSelect');
       const downloadBtn = document.getElementById('downloadBtn');
+      const previewBtn = document.getElementById('previewBtn');
       const tabImage = document.getElementById('tabImage');
       const tabVideo = document.getElementById('tabVideo');
       const sourceTabs = document.getElementById('sourceTabs');
@@ -839,7 +857,7 @@
         `;
         if (progressTimer) { clearInterval(progressTimer); }
         progressTimer = setInterval(() => {
-          const step = progressValue < 80 ? 5 : 2;
+          const step = progressValue < 80 ? 2 : 1;
           progressValue = Math.min(95, progressValue + step);
           const bar = document.getElementById('progressBarInner');
           const pct = document.getElementById('progressPercent');
@@ -864,7 +882,7 @@
             }
           }
           if (stripe) stripe.style.display = progressValue >= 95 ? 'block' : 'none';
-        }, 200);
+        }, 120);
       }
       function finishProgress() {
         if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
@@ -987,7 +1005,7 @@
         progressValue = Math.max(Number(lastProgressDisplay || 0), 5);
         if (progressTimer) { clearInterval(progressTimer); }
         progressTimer = setInterval(() => {
-          const step = progressValue < 80 ? 3 : 1;
+          const step = progressValue < 80 ? 2 : 1;
           progressValue = Math.min(95, progressValue + step);
           const bar = document.getElementById('progressBarInner');
           const pct = document.getElementById('progressPercent');
@@ -1023,7 +1041,7 @@
             }
           }
           if (stripe) stripe.style.display = progressValue >= 95 ? 'block' : 'none';
-        }, 200);
+        }, 120);
       }
       function readHead(file, n = 32) {
         return new Promise((resolve, reject) => {
@@ -1327,7 +1345,7 @@
             : 'px-6 h-10 rounded-full font-bold text-sm leading-none text-slate-700 dark:text-slate-300 relative z-10 transition-colors flex items-center';
           positionTabIndicator(imgActive ? tabImageMobile : tabVideoMobile);
         }
-        statusText.textContent = 'No file selected yet';
+        statusText.textContent = 'No file uploaded yet';
         if (inputHeading) {
           inputHeading.textContent = imgActive ? 'Original Image' : 'Original Video';
         }
@@ -1439,7 +1457,9 @@
         intensityRaf = requestAnimationFrame(() => {
           intensityRaf = 0;
           updateIntensityUI();
-          // Do not modify statusText here; it should only reflect the uploaded file name
+          if (updateStatus) {
+            const _ = String(intensityRange.value);
+          }
         });
       };
       intensityRange.addEventListener('input', () => {
@@ -1467,7 +1487,7 @@
       const typeMenu = document.getElementById('typeMenu');
       const TYPE_LABELS = { blur: 'Gaussian Blur', pixelate: 'Pixelation Grid', black_bar: 'Censored Black Bar' };
       typeSelect.addEventListener('change', () => {
-        // Do not modify statusText here; it should only reflect the uploaded file name
+        const _ = TYPE_LABELS[typeSelect.value] || typeSelect.value;
       });
       if (typeSelectWrapper && typeSelectBtn && typeMenu && typeSelectText && typeSelect) {
         const closeMenu = () => { typeSelectWrapper.classList.remove('select-open'); typeSelectBtn.setAttribute('aria-expanded','false'); };
@@ -1562,9 +1582,9 @@
           resultBlobUrl === null &&
           !busy &&
           currentAbortController === null &&
-          statusText && statusText.textContent === 'No file selected yet' &&
+          statusText && statusText.textContent === 'No file uploaded yet' &&
           typeSelect && typeSelect.value === 'blur' &&
-          intensityRange && String(intensityRange.value) === '50' &&
+          intensityRange && String(intensityRange.value) === '40' &&
           (!f || f.checked === false);
         if (isDefault) {
           return;
@@ -1587,19 +1607,19 @@
         } else {
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-4xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized video will appear here</p>`;
         }
-        statusText.textContent = 'No file selected yet';
+        statusText.textContent = 'No file uploaded yet';
         
         setDownloadEnabled(false);
         setAnonymizeEnabled(false, false);
         updateMetrics({ faces: null, ms: null, type: '', status: '' });
         // reset controls
         if (typeSelect && typeSelectText) {
-          typeSelect.value = 'pixelate';
-          typeSelectText.textContent = 'Pixelation Grid';
+          typeSelect.value = 'blur';
+          typeSelectText.textContent = 'Gaussian Blur';
         }
         if (intensityRange && intensityLabel) {
-          intensityRange.value = 50;
-          intensityLabel.textContent = '50%';
+          intensityRange.value = 40;
+          intensityLabel.textContent = '40%';
           updateIntensityUI();
         }
         try {
@@ -1738,7 +1758,15 @@
           if (success && resultBlobUrl) {
             finishProgress();
             await new Promise(r => setTimeout(r, 300));
-          resultBox.innerHTML = `<img class="bg-blur" src="${resultBlobUrl}" alt="" decoding="async"><img class="img-main" src="${resultBlobUrl}" alt="Anonymized result preview" decoding="async">`;
+          resultBox.innerHTML = `<img class="bg-blur" src="${resultBlobUrl}" alt="" decoding="async"><img class="img-main" src="${resultBlobUrl}" alt="Anonymized result preview" decoding="async" style="cursor: pointer;">`;
+            try {
+              const imgEl = resultBox.querySelector('.img-main');
+              if (imgEl) {
+                imgEl.addEventListener('click', () => {
+                  try { openPreviewOverlayForImage(resultBlobUrl); } catch {}
+                });
+              }
+            } catch {}
             setDownloadEnabled(true);
             toast('Anonymized image ready', 'success', 2000);
           }
@@ -2095,7 +2123,7 @@
         selectedFile = null;
         dropArea.innerHTML = source === 'image' ? renderDropAreaContent() : renderVideoPlaceholderContent();
         bindUploadControls();
-        statusText.textContent = 'No file selected yet';
+        statusText.textContent = 'No file uploaded yet';
         if (source === 'image') {
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-4xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized image will appear here</p>`;
         } else {
@@ -2110,6 +2138,31 @@
         const msg = message ? `Upload cleared — ${message}` : 'Upload cleared';
         toast(msg, 'warning', 6000);
       }
+
+      function shortenMiddle(name, maxLen) {
+        if (!name || name.length <= maxLen) return name;
+        const idx = name.lastIndexOf('.');
+        const ext = idx > 0 ? name.slice(idx) : '';
+        const base = idx > 0 ? name.slice(0, idx) : name;
+        const budget = Math.max(3, maxLen - ext.length - 1);
+        const head = Math.ceil(budget / 2);
+        const tail = Math.floor(budget / 2);
+        return base.slice(0, head) + '…' + base.slice(-tail) + ext;
+      }
+      function formatFileNameForDisplay(name) {
+        let maxLen = 48;
+        const w = window.innerWidth || 1024;
+        if (w <= 360) maxLen = 18;
+        else if (w <= 480) maxLen = 24;
+        else if (w <= 640) maxLen = 32;
+        return shortenMiddle(name, maxLen);
+      }
+      function updateStatusTextForViewport() {
+        if (selectedFile && statusText) {
+          statusText.textContent = formatFileNameForDisplay(selectedFile.name || '');
+        }
+      }
+      window.addEventListener('resize', () => { updateStatusTextForViewport(); }, { passive: true });
 
       async function handleFiles(files) {
         if (!files || !files.length) return;
@@ -2140,11 +2193,11 @@
         selectedPreviewUrl = URL.createObjectURL(f);
         if (mode === 'image') {
           dropArea.innerHTML = `<img class="bg-blur" src="${selectedPreviewUrl}" alt="" decoding="async"><img class="img-main" src="${selectedPreviewUrl}" alt="Original image preview" decoding="async">`;
-          statusText.textContent = f.name;
+          statusText.textContent = formatFileNameForDisplay(f.name);
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized image will appear here</p>`;
         } else {
           dropArea.innerHTML = `<video class="img-main w-full h-full" src="${selectedPreviewUrl}" controls preload="metadata" playsinline webkit-playsinline controlsList="nodownload noremoteplayback"></video>`;
-          statusText.textContent = f.name;
+          statusText.textContent = formatFileNameForDisplay(f.name);
           resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized video will appear here</p>`;
           try { if (selectedVideoPosterUrl) { URL.revokeObjectURL(selectedVideoPosterUrl); selectedVideoPosterUrl = null; } } catch {}
           const v = dropArea.querySelector('video');
@@ -2302,6 +2355,7 @@
           downloadBtn.classList.remove('bg-primary','hover:bg-primary/90','text-on-primary','border-primary','border-slate-900','dark:border-slate-100');
           downloadBtn.setAttribute('disabled','');
           downloadBtn.innerHTML = '<span class="material-symbols-outlined text-[26px]">download</span>Download';
+          try { closePreviewOverlay(); } catch {}
         }
       }
       downloadBtn.addEventListener('click', () => {
@@ -2334,10 +2388,68 @@
           toast('Downloaded successfully', 'success', 1600);
         }
       });
+      (function setupPreviewOverlay(){
+        const init = () => {
+          const ov = document.getElementById('previewOverlay');
+          const inner = document.getElementById('previewInner');
+          const img = document.getElementById('previewMediaImg');
+          const vid = document.getElementById('previewMediaVideo');
+          if (!ov || !inner || !img || !vid) return;
+          const close = () => {
+            ov.style.display = 'none';
+            try { vid.pause(); } catch {}
+            try { vid.removeAttribute('src'); vid.load(); } catch {}
+          };
+          ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+          document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ov.style.display !== 'none') close(); });
+        };
+        if (document.readyState === 'complete') {
+          init();
+        } else {
+          window.addEventListener('load', init, { once: true });
+        }
+      })();
+      function closePreviewOverlay() {
+        const ov = document.getElementById('previewOverlay');
+        const vid = document.getElementById('previewMediaVideo');
+        if (!ov) return;
+        ov.style.display = 'none';
+        try { if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); } } catch {}
+      }
+      function openPreviewOverlayForImage(url) {
+        const ov = document.getElementById('previewOverlay');
+        const img = document.getElementById('previewMediaImg');
+        const vid = document.getElementById('previewMediaVideo');
+        if (!ov || !img || !vid || !url) return;
+        vid.style.display = 'none';
+        try { vid.pause(); vid.removeAttribute('src'); vid.load(); } catch {}
+        img.style.display = 'none';
+        const onLoad = () => {
+          img.removeEventListener('load', onLoad);
+          img.removeEventListener('error', onError);
+          img.style.display = 'block';
+          ov.style.display = 'flex';
+        };
+        const onError = () => {
+          img.removeEventListener('load', onLoad);
+          img.removeEventListener('error', onError);
+          try { img.removeAttribute('src'); } catch {}
+          try { toast('Unable to preview image', 'error', 3000); } catch {}
+        };
+        img.addEventListener('load', onLoad);
+        img.addEventListener('error', onError);
+        img.src = url;
+      }
       function mapIntensityToBlur(percent) {
         const p = Math.max(5, Math.min(100, Number(percent)));
         return 2 + (p / 100) * 8;
       }
     </script>
+    <div id="previewOverlay" style="display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,0.72); align-items:center; justify-content:center; padding:16px;">
+    <div id="previewInner" style="max-width:90vw; max-height:90vh;">
+      <img id="previewMediaImg" alt="" style="max-width:100%; max-height:90vh; border-radius:12px; display:none;"/>
+      <video id="previewMediaVideo" style="max-width:100%; max-height:90vh; border-radius:12px; display:none;" controls playsinline></video>
+    </div>
+    </div>
   </body>
 </html>
