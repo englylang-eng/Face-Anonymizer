@@ -829,6 +829,34 @@
       const logs = [];
       let source = 'image';
       const MIN_PROCESS_MS = 800;
+      // Realistic progress messaging based on phase and percent
+      let progressKind = '';
+      let progressPhase = '';
+      function updateProgressLabelByPercent(kind, percent) {
+        const lbl = document.getElementById('progressLabel');
+        if (!lbl) return;
+        const p = Math.max(0, Math.min(100, Math.round(percent)));
+        let next = '';
+        if (kind === 'image') {
+          if (p < 10) next = 'Preparing image';
+          else if (p < 40) next = 'Detecting faces';
+          else if (p < 80) next = 'Applying anonymization';
+          else if (p < 95) next = 'Rendering result';
+          else next = 'Finalizing';
+        } else if (kind === 'video') {
+          if (p < 20) next = 'Preparing frames';
+          else if (p < 50) next = 'Detecting faces';
+          else if (p < 85) next = 'Blurring faces';
+          else if (p < 95) next = 'Encoding video';
+          else next = 'Finalizing';
+        } else {
+          next = lbl.textContent || 'Processing';
+        }
+        if (next && next !== progressPhase) {
+          lbl.textContent = next;
+          progressPhase = next;
+        }
+      }
       const metricFaces = () => document.getElementById('metricFaces');
       const metricTime = () => document.getElementById('metricTime');
       const metricType = () => document.getElementById('metricType');
@@ -887,6 +915,8 @@
       function finishProgress() {
         if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
         if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); finalizeAnimTimer = null; }
+        progressKind = '';
+        progressPhase = '';
         const bar = document.getElementById('progressBarInner');
         const pct = document.getElementById('progressPercent');
         const stripe = document.getElementById('progressStripe');
@@ -901,6 +931,8 @@
         if (scanAnimTimer) { clearInterval(scanAnimTimer); scanAnimTimer = null; }
         progressValue = 0;
         lastProgressDisplay = 0;
+        progressKind = '';
+        progressPhase = '';
         resultBox.innerHTML = `<div class="upload-circle bg-slate-200 text-slate-600 flex items-center justify-center transition-transform"><span class="material-symbols-outlined text-5xl">visibility_off</span></div><p class="text-xs px-12 text-slate-500">Your anonymized image will appear here</p>`;
       }
       function startChecking(kind) {
@@ -977,9 +1009,12 @@
             pct.textContent = Math.round(nv) + '%';
           }
         }
-        if (labelText) {
-          const lbl = document.getElementById('progressLabel');
-          if (lbl) lbl.textContent = labelText;
+        const lbl = document.getElementById('progressLabel');
+        if (labelText && lbl) {
+          lbl.textContent = labelText;
+          progressPhase = '';
+        } else if (!labelText && lbl && progressKind) {
+          updateProgressLabelByPercent(progressKind, nv);
         }
       }
       function beginProcessingProgress(kind) {
@@ -1002,6 +1037,8 @@
         } else {
           lbl.textContent = kind === 'video' ? 'Processing video' : 'Processing image';
         }
+        progressKind = kind;
+        progressPhase = '';
         progressValue = Math.max(Number(lastProgressDisplay || 0), 5);
         if (progressTimer) { clearInterval(progressTimer); }
         progressTimer = setInterval(() => {
@@ -1041,7 +1078,9 @@
             }
           }
           if (stripe) stripe.style.display = progressValue >= 95 ? 'block' : 'none';
+          if (progressKind) { updateProgressLabelByPercent(progressKind, disp); }
         }, 120);
+        
       }
       function readHead(file, n = 32) {
         return new Promise((resolve, reject) => {
@@ -1852,6 +1891,8 @@
               const lbl = document.getElementById('progressLabel');
               if (lbl) lbl.textContent = 'Processing video';
               // Reset progress for processing phase so we don't carry over 100% from upload
+              progressKind = 'video';
+              progressPhase = '';
               progressValue = 0;
               lastProgressDisplay = 0;
               const pctEl = document.getElementById('progressPercent');
@@ -1930,6 +1971,7 @@
                   }
                 }
                 if (stripe) stripe.style.display = next >= 95 && !pj.done ? 'block' : 'none';
+                try { if (progressKind === 'video') { updateProgressLabelByPercent('video', disp); } } catch {}
                 if (pj.done) {
                   if (jobPollTimer) { clearInterval(jobPollTimer); jobPollTimer = null; }
                   if (pj.faces === 0) {
@@ -2111,6 +2153,8 @@
         try { if (progressTimer) { clearInterval(progressTimer); } } catch {}
         try { if (finalizeAnimTimer) { clearInterval(finalizeAnimTimer); } } catch {}
         try { if (scanAnimTimer) { clearInterval(scanAnimTimer); } } catch {}
+        progressKind = '';
+        progressPhase = '';
         progressTimer = null;
         finalizeAnimTimer = null;
         scanAnimTimer = null;
